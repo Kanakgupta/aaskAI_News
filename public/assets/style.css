@@ -201,3 +201,6 @@ main{padding-block:22px 60px;min-height:70vh;outline:none}
 .cochips a:hover{border-color:var(--a1)}
 
 .orig{font-size:11px;color:var(--soft);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+.back{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;margin-bottom:12px;border-radius:50%;background:linear-gradient(135deg,#087f75,#15998f 55%,#dc644e);color:#fff;box-shadow:0 6px 18px rgba(8,127,117,.3);transition:transform .15s,box-shadow .15s}
+.back:hover{transform:translateX(-3px);box-shadow:0 8px 22px rgba(220,100,78,.35)}
