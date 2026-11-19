@@ -3,12 +3,12 @@
 
 const CATS = [
   { id: "stocks", label: "Stock Market", hue: 150, blurb: "India and US market, macro, earnings and IPO headlines from major publishers, updated live." },
+  { id: "crypto", label: "Crypto", hue: 45, blurb: "Bitcoin, Ethereum, regulation and on-chain news." },
   { id: "tech", label: "Technology", hue: 200, blurb: "The wireless newsroom: Wi-Fi, Bluetooth, UWB / Matter / NearLink and the business around them — de-duplicated, clustered and ranked." },
   { id: "ai", label: "AI", hue: 265, blurb: "Models, labs, chips, startups and policy." },
   { id: "world", label: "World", hue: 35, blurb: "Global headlines from international broadcasters and wires." },
   { id: "politics", label: "Politics", hue: 0, blurb: "Washington, Westminster and the leaders in the news." },
   { id: "prediction", label: "Prediction", hue: 300, blurb: "What big agencies, banks and analysts forecast for next year, leaders, wars, markets and tech — plus live crowd odds." },
-  { id: "crypto", label: "Crypto", hue: 45, blurb: "Bitcoin, Ethereum, regulation and on-chain news." },
   { id: "science", label: "Science", hue: 175, blurb: "Space, climate and discoveries." },
   { id: "health", label: "Health", hue: 340, blurb: "Medicine, public health and biotech." },
   { id: "sports", label: "Sports", hue: 100, blurb: "Scores, transfers and big moments." },

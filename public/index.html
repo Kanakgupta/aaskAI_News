@@ -14,18 +14,22 @@
 <a class="skip" href="#view">Skip to news</a>
 <header class="hero">
   <div class="aurora" aria-hidden="true"></div>
-  <div class="wrap">
-    <a class="brand" href="#/home" aria-label="aaskAI News home">aask<span>AI</span> News</a>
-    <div class="status" id="status" aria-live="polite"><span class="dot"></span><span id="statusText">Fetching latest headlines…</span></div>
+  <div class="wrap herorow">
+    <div class="herol">
+      <a class="brand" href="#/home" aria-label="aaskAI News home">aask<span>AI</span> News</a>
+      <div class="status" id="status" aria-live="polite"><span class="dot"></span><span id="statusText">Fetching latest headlines…</span></div>
+    </div>
+    <div class="heror">
+      <form class="search" id="searchForm" role="search" autocomplete="off">
+        <input id="q" type="search" placeholder="Search all news…" aria-label="Search all news">
+      </form>
+      <button class="rbtn" id="refreshAll" type="button" title="Fetch the newest published headlines now">↻ Refresh</button>
+    </div>
   </div>
 </header>
 <nav class="catnav" aria-label="News categories">
-  <div class="wrap navrow">
+  <div class="wrap">
     <div class="cats" id="cats" role="tablist"></div>
-    <form class="search" id="searchForm" role="search" autocomplete="off">
-      <input id="q" type="search" placeholder="Search all news…" aria-label="Search all news">
-    </form>
-    <button class="rbtn" id="refreshAll" type="button" title="Fetch the newest published headlines now">↻ Refresh</button>
   </div>
 </nav>
 <main class="wrap" id="view" tabindex="-1"></main>
