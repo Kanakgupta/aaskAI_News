@@ -1,4 +1,5 @@
 import { fetchFeed, googleUrl, tokens } from "./rss.js";
+import { localize } from "./translate.js";
 
 // Wireless-industry newsroom: Wi-Fi, Bluetooth, UWB/Matter/NearLink and the business around them.
 const TOPICS = [
@@ -180,6 +181,7 @@ export async function buildTech() {
     delete row._w; delete row._t1;
     return row;
   }).sort((a, b) => b.d.localeCompare(a.d)).slice(0, 700);
+  await localize(items);
 
   const topicLabels = [
     ...TOPICS.map(([id, label]) => ({ id, label })),

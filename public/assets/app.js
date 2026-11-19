@@ -366,12 +366,17 @@ const hAgo = (iso) => {
   return `${Math.floor(h / 24)} days ago`;
 };
 
+function langName(code) {
+  try { return new Intl.DisplayNames(["en"], { type: "language" }).of(code); } catch { return ""; }
+}
+
 function card(n, o = {}) {
+  const orig = n.to ? `<div class="orig" title="${esc(n.to)}">Translated${n.lg && langName(n.lg) ? ` from ${esc(langName(n.lg))}` : ""} · Original: ${esc(n.to)}</div>` : "";
   const img = n.i ? `<img class="hthumb" src="${esc(n.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : "";
   const tag = o.tag ? `<span class="htag">${esc(o.tag)}</span>` : "";
   const cat = o.catLabel ? `<span class="htag">${esc(o.catLabel)}</span>` : "";
   return `<li class="hitem">${img}<div class="hbody"><div class="hmeta">${cat}${tag}<span class="hsrc">${esc(n.s)}</span><span class="htime">${hAgo(n.d)}</span>${n.w ? '<span class="badge">Press release</span>' : ""}${o.cov || ""}</div>
-    <a class="htitle" href="${esc(safe(n.u))}" target="_blank" rel="noopener noreferrer">${esc(n.t)}</a>${n.x ? `<p class="hdesc">${esc(n.x)}</p>` : ""}${o.extra || ""}</div></li>`;
+    <a class="htitle" href="${esc(safe(n.tu || n.u))}" target="_blank" rel="noopener noreferrer">${esc(n.t)}</a>${orig}${n.x ? `<p class="hdesc">${esc(n.x)}</p>` : ""}${o.extra || ""}</div></li>`;
 }
 
 // AI and Politics have their own sections, so the stock page leaves them out.
@@ -583,7 +588,7 @@ function drawSearch() {
   matched.forEach((c) => ensureShard(c.k));
   const hits = [];
   for (const c of CATS) for (const n of store[c.id]?.items || []) {
-    const hay = (n.t + " " + (n.x || "") + " " + n.s).toLowerCase();
+    const hay = (n.t + " " + (n.to || "") + " " + (n.x || "") + " " + n.s).toLowerCase();
     if (terms.every((t) => hay.includes(t))) hits.push({ n, label: c.label });
   }
   for (const c of matched) for (const n of companyItems(c)) hits.push({ n, label: c.n });

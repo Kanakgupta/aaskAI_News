@@ -1,4 +1,5 @@
 import { fetchFeed, googleUrl, dedupe } from "./rss.js";
+import { localize } from "./translate.js";
 
 // [name, search terms (|), sector, region, optional Google News query override]
 const LIST = [
@@ -291,5 +292,6 @@ export const companyIndex = () => COMPANIES.map((c) => ({ id: c.id, n: c.name, t
 export async function buildShard(k, prev) {
   const mine = COMPANIES.filter((c) => c.k === k);
   const items = await pool(mine.map((c) => () => refresh(c, prev?.companies?.[c.id]?.items)), 6);
+  await localize(items.flat());
   return { companies: Object.fromEntries(mine.map((c, i) => [c.id, { items: items[i] }])) };
 }

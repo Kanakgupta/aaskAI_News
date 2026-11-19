@@ -6,6 +6,7 @@ import { buildTech } from "../src/tech.js";
 import { buildMarkets } from "../src/markets.js";
 import { buildPredictions } from "../src/predictions.js";
 import { SHARDS, companyIndex, buildShard } from "../src/companies.js";
+import { loadCache, exportCache } from "../src/translate.js";
 
 const OUT = new URL("../public/data/", import.meta.url);
 const SITE = (process.env.SITE_URL || "").replace(/\/?$/, "/");
@@ -67,6 +68,7 @@ async function publishCompanies() {
   }
 }
 
+loadCache(await previous("translations"));
 const jobs = [
   publishCompanies(),
   ...Object.keys(CATEGORIES).map((id) => publish(`news-${id}`, () => buildCategory(id), (b) => b.items.length)),
@@ -75,3 +77,4 @@ const jobs = [
   publish("predictions", buildPredictions, (b) => b.items.length),
 ];
 await Promise.all(jobs);
+await writeFile(new URL("translations.json", OUT), JSON.stringify(exportCache()));
