@@ -99,7 +99,13 @@ async function refreshNow() {
   const times = ids.map((id) => store[id]?.generated).filter(Boolean).map((g) => new Date(g).getTime());
   if (!ok.length) toast("Could not reach the news data. Check your connection and try again.");
   else if (added) toast(`${added} new ${added === 1 ? "story" : "stories"} added at the top.`);
-  else toast(`You're up to date. Latest data was published ${ago(new Date(Math.max(...times)).toISOString())}; the site rebuilds every 5 minutes.`, 6000);
+  else {
+    const newest = Math.max(...times);
+    const staleMin = (Date.now() - newest) / 6e4;
+    toast(staleMin > 15
+      ? `No newer data yet. The server copy is ${ago(new Date(newest).toISOString()).replace(" ago", "")} old because the scheduled rebuild has not run since.`
+      : `You're up to date. Latest data was published ${ago(new Date(newest).toISOString())}.`, 7000);
+  }
   btn.disabled = false;
   refreshing = false;
 }
