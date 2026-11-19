@@ -160,6 +160,7 @@ function parseRoute() {
   const h = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
   if (!h || h === "home") return { name: "home" };
   if (h.startsWith("search/")) return { name: "search", q: h.slice(7) };
+  if (h.startsWith("company/")) return { name: "company", id: h.slice(8) };
   if (h === "stocks/usa") return { name: "cat", cat: "stocks", market: "usa" };
   if (CAT[h]) return { name: "cat", cat: h };
   return { name: "home" };
@@ -176,6 +177,7 @@ function render() {
   if (on) $("#cats").scrollTo({ left: on.offsetLeft - 24, behavior: "smooth" });
   if (route.name === "home") renderHome();
   else if (route.name === "search") renderSearch();
+  else if (route.name === "company") renderCompany();
   else renderCat();
   rendered = true;
   window.scrollTo({ top: Math.min(window.scrollY, $(".catnav").offsetTop), behavior: "instant" });
@@ -487,33 +489,140 @@ function drawTech(d) {
   mountList($("#list"), rows, techRow);
 }
 
-// ---------- SEARCH
+// ---------- COMPANIES: global tech-company news (pre-fetched into rotating shards by the build)
+const coIdx = { list: [], byId: {} };
+const coShard = {}, coFailed = {}, coInflight = {};
+const googleLink = (q) => `https://news.google.com/search?q=${encodeURIComponent(q + " when:30d")}`;
+
+function setIndex(d) {
+  coIdx.list = d.companies || [];
+  coIdx.byId = Object.fromEntries(coIdx.list.map((c) => [c.id, c]));
+}
+function loadIndex() {
+  const had = coIdx.list.length > 0;
+  return fetch(`data/companies-index.json?t=${slot()}`).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
+    setIndex(d); saveLocal("coidx", d);
+    if (!had && rendered && (route.name === "company" || route.name === "search")) render();
+  }).catch(() => {});
+}
+function loadShard(k) {
+  if (coInflight[k]) return coInflight[k];
+  coInflight[k] = fetch(`data/co-${k}.json?t=${slot()}`).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
+    coFailed[k] = false;
+    if (!coShard[k] || new Date(d.generated) > new Date(coShard[k].generated)) { coShard[k] = d; onCompanyData(); }
+  }).catch(() => { coFailed[k] = true; onCompanyData(); }).finally(() => { delete coInflight[k]; });
+  return coInflight[k];
+}
+const ensureShard = (k) => { if (!coShard[k] && !coInflight[k] && !coFailed[k]) loadShard(k); };
+function onCompanyData() {
+  if (!rendered) return;
+  if (route.name === "company") drawCompany();
+  else if (route.name === "search") drawSearch();
+}
+const companyItems = (c) => coShard[c.k]?.companies?.[c.id]?.items || [];
+
+// Best matches first: exact term, then prefix, then word prefix, then substring.
+function matchCompanies(q) {
+  q = q.trim().toLowerCase();
+  if (q.length < 2) return [];
+  const out = [];
+  for (const c of coIdx.list) {
+    const terms = [c.n, ...c.t].map((s) => s.toLowerCase());
+    let score = 0;
+    if (terms.includes(q)) score = 100;
+    else if (terms.some((t) => t.startsWith(q))) score = 60;
+    else if (terms.some((t) => t.split(/[^a-z0-9]+/).some((w) => w.startsWith(q)))) score = 40;
+    else if (q.length >= 3 && terms.some((t) => t.includes(q))) score = 20;
+    if (score) out.push({ c, score });
+  }
+  return out.sort((a, b) => b.score - a.score || a.c.n.localeCompare(b.c.n));
+}
+
+const timeButtons = (days) => `<div class="fgroup"><span class="lbl">Time</span>${[[1, "24 hours"], [7, "7 days"], [30, "30 days"]].map(([v, t]) => `<button class="tbtn${days === v ? " on" : ""}" data-days="${v}" type="button">${t}</button>`).join("")}</div>`;
+const inDays = (n, days) => new Date(n.d).getTime() >= Date.now() - days * 864e5;
+
+function renderCompany() {
+  const c = coIdx.byId[route.id];
+  route.days = 30;
+  view.innerHTML = `<section class="page" style="--h:170">
+    <div class="phead"><h1>${esc(c ? c.n : "Company")}</h1><div class="pstat"><span id="cnt"></span></div>
+    <p>${c ? `${esc(c.s)} · ${esc(c.r)}. Headlines from the past 30 days across global publishers.` : "Loading company…"}</p></div>
+    <div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
+  if (c) ensureShard(c.k);
+  drawCompany();
+}
+function drawCompany() {
+  const list = $("#list");
+  if (!list) return;
+  const c = coIdx.byId[route.id];
+  if (!c) { list.innerHTML = coIdx.list.length ? '<div class="err">Company not found. Use the search box above.</div>' : `<ul class="rows">${skeletons(6, true)}</ul>`; return; }
+  const sh = coShard[c.k];
+  if (!sh) { list.innerHTML = coFailed[c.k] ? '<div class="err">Could not load this company right now.</div>' : `<ul class="rows">${skeletons(9, true)}</ul>`; return; }
+  const f = $("#filters");
+  f.innerHTML = timeButtons(route.days);
+  f.onclick = (e) => { const b = e.target.closest("[data-days]"); if (b) { route.days = +b.dataset.days; drawCompany(); } };
+  const items = companyItems(c).filter((n) => inDays(n, route.days));
+  $("#cnt").textContent = `${items.length} stories · updated ${ago(sh.generated)}`;
+  if (!items.length) { list.innerHTML = `<div class="err">No stories in this window. <a class="more" href="${esc(googleLink(c.n))}" target="_blank" rel="noopener noreferrer">Search Google News for ${esc(c.n)} ↗</a></div>`; return; }
+  mountList(list, items, (n) => card(n, {}));
+}
+
+// ---------- SEARCH (all sections + matching company news)
 function renderSearch() {
-  pageShell({ id: "search", label: `Search: ${route.q}`, hue: 210, blurb: "Across every category loaded so far." });
+  route.days = 30;
+  view.innerHTML = `<section class="page" style="--h:210">
+    <div class="phead"><h1>Search: ${esc(route.q)}</h1><div class="pstat"><span id="cnt"></span></div><div class="cochips" id="coChips"></div></div>
+    <div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
   drawSearch();
 }
 function drawSearch() {
+  const list = $("#list");
+  if (!list) return;
   const terms = route.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const matched = matchCompanies(route.q).filter((m) => m.score >= 40).slice(0, 3).map((m) => m.c);
+  matched.forEach((c) => ensureShard(c.k));
   const hits = [];
   for (const c of CATS) for (const n of store[c.id]?.items || []) {
     const hay = (n.t + " " + (n.x || "") + " " + n.s).toLowerCase();
-    if (terms.every((t) => hay.includes(t))) hits.push({ n, c });
+    if (terms.every((t) => hay.includes(t))) hits.push({ n, label: c.label });
   }
+  for (const c of matched) for (const n of companyItems(c)) hits.push({ n, label: c.n });
   hits.sort((a, b) => b.n.d.localeCompare(a.n.d));
   const seen = new Set();
-  const uniq = hits.filter((h) => !seen.has(h.n.u) && seen.add(h.n.u));
-  const loading = CATS.filter((c) => !store[c.id]).length;
-  $("#cnt").textContent = `${uniq.length} stories${loading ? ` · still loading ${loading} feeds` : ""}`;
-  mountList($("#list"), uniq, ({ n, c }) => card(n, { catLabel: c.label }));
+  const uniq = hits.filter((h) => inDays(h.n, route.days) && !seen.has(h.n.u) && seen.add(h.n.u));
+  const f = $("#filters");
+  f.innerHTML = timeButtons(route.days);
+  f.onclick = (e) => { const b = e.target.closest("[data-days]"); if (b) { route.days = +b.dataset.days; drawSearch(); } };
+  $("#coChips").innerHTML = matched.map((c) => `<a href="#/company/${esc(c.id)}">${esc(c.n)} →</a>`).join("")
+    + `<a href="${esc(googleLink(route.q))}" target="_blank" rel="noopener noreferrer">Search Google News for “${esc(route.q)}” ↗</a>`;
+  const loading = CATS.filter((c) => !store[c.id]).length + matched.filter((c) => !coShard[c.k] && !coFailed[c.k]).length;
+  $("#cnt").textContent = `${uniq.length} stories${loading ? " · still loading" : ""}`;
+  mountList(list, uniq, ({ n, label }) => card(n, { catLabel: label }));
 }
 
-// ---------- chrome: nav, status, search box
+// ---------- chrome: nav, status, search box with company suggestions
+function showSuggest() {
+  const q = $("#q").value.trim();
+  const sug = $("#suggest");
+  if (q.length < 2) { sug.hidden = true; return; }
+  const m = matchCompanies(q).slice(0, 7);
+  sug.innerHTML = m.map(({ c }) => `<a href="#/company/${esc(c.id)}"><b>${esc(c.n)}</b><span>${esc(c.s)} · ${esc(c.r)}</span></a>`).join("")
+    + `<a href="#/search/${encodeURIComponent(q)}"><b>Search all news for “${esc(q)}”</b><span>Every section, last 30 days</span></a>`;
+  sug.hidden = false;
+}
 function buildNav() {
   $("#cats").innerHTML = [{ id: "home", label: "Home", hue: 210 }, ...CATS].map((c) => `<a class="cbtn" role="tab" data-id="${c.id}" href="#/${c.id}" style="--h:${c.hue}">${esc(c.label)}</a>`).join("");
+  const q = $("#q");
+  q.addEventListener("input", showSuggest);
+  q.addEventListener("focus", showSuggest);
+  q.addEventListener("blur", () => setTimeout(() => ($("#suggest").hidden = true), 180));
   $("#searchForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const q = $("#q").value.trim();
-    if (q) location.hash = "#/search/" + encodeURIComponent(q);
+    const text = q.value.trim();
+    if (!text) return;
+    const best = matchCompanies(text)[0];
+    $("#suggest").hidden = true;
+    location.hash = best && best.score >= 60 ? "#/company/" + best.c.id : "#/search/" + encodeURIComponent(text);
   });
 }
 
@@ -526,12 +635,15 @@ function updateStatus() {
 
 document.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.remove(); }, true);
 $("#newPill").addEventListener("click", () => { route.drawn = false; drawCat(); window.scrollTo({ top: $(".catnav").offsetTop, behavior: "smooth" }); });
-window.addEventListener("hashchange", render);
+window.addEventListener("hashchange", () => { $("#suggest").hidden = true; render(); });
 
 // ---------- boot: paint cached data immediately, then fetch everything in parallel in the background
 buildNav();
 for (const id of [...CATS.map((c) => c.id), ...EXTRA]) { const d = readLocal(id); if (d?.items) store[id] = d; }
 for (const k of Object.keys(aux)) aux[k] = readLocal(k);
+const cachedIdx = readLocal("coidx");
+if (cachedIdx) setIndex(cachedIdx);
+loadIndex();
 route = parseRoute();
 render();
 updateStatus();
@@ -539,5 +651,6 @@ loadAll();
 setInterval(() => [...CATS.map((c) => c.id), ...EXTRA].forEach(loadCat), 2 * 60 * 1000);
 setInterval(() => { loadAux("markets"); loadAux("predictions"); }, 2 * 60 * 1000);
 setInterval(updateStatus, 30000);
+setInterval(() => { loadIndex(); for (const k in coFailed) delete coFailed[k]; Object.keys(coShard).forEach(loadShard); }, 2 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { [...CATS.map((c) => c.id), ...EXTRA].forEach(loadCat); loadAux("markets"); } });
 })();

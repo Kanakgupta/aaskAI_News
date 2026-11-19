@@ -187,3 +187,15 @@ main{padding-block:22px 60px;min-height:70vh;outline:none}
 @media(max-width:700px){.blocks{grid-template-columns:1fr}.heror{width:100%}.search{flex:1}.search input{width:100%}.thumb{width:92px;height:68px}.fgroup .lbl{min-width:100%}}
 @media(max-width:480px){.page .rows{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}.tk-wrap{overflow-x:auto}}
+
+/* company search suggestions */
+.search{position:relative}
+.suggest{position:absolute;top:calc(100% + 6px);right:0;width:min(420px,92vw);background:#fff;border:1px solid var(--line2);border-radius:12px;box-shadow:0 12px 40px rgba(26,77,67,.2);overflow:hidden;z-index:60}
+.suggest a{display:flex;flex-direction:column;padding:10px 14px;border-top:1px solid var(--line)}
+.suggest a:first-child{border-top:0}
+.suggest a:hover{background:#eef6f1}
+.suggest b{font-size:.9rem}
+.suggest span{font-size:.72rem;color:var(--muted)}
+.cochips{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px}
+.cochips a{padding:4px 12px;border-radius:999px;border:1px solid #a8d1bd;background:#e6f3ec;color:#08766c;font-weight:600;font-size:.85rem}
+.cochips a:hover{border-color:var(--a1)}

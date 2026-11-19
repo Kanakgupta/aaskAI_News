@@ -1,0 +1,295 @@
+import { fetchFeed, googleUrl, dedupe } from "./rss.js";
+
+// [name, search terms (|), sector, region, optional Google News query override]
+const LIST = [
+  // Semiconductors
+  ["NXP Semiconductors", "NXP|NXP Semiconductors|NXPI", "Semiconductors", "Europe"],
+  ["Nvidia", "Nvidia|NVDA", "Semiconductors", "Americas"],
+  ["AMD", "AMD|Advanced Micro Devices", "Semiconductors", "Americas"],
+  ["Intel", "Intel|INTC", "Semiconductors", "Americas", "Intel Corp OR Intel chip OR Intel foundry"],
+  ["Qualcomm", "Qualcomm|QCOM|Snapdragon", "Semiconductors", "Americas"],
+  ["Broadcom", "Broadcom|AVGO", "Semiconductors", "Americas"],
+  ["Texas Instruments", "Texas Instruments|TXN", "Semiconductors", "Americas"],
+  ["Analog Devices", "Analog Devices|ADI", "Semiconductors", "Americas", "\"Analog Devices\""],
+  ["Micron", "Micron|MU", "Semiconductors", "Americas", "Micron Technology OR Micron memory"],
+  ["Marvell", "Marvell|MRVL", "Semiconductors", "Americas"],
+  ["Microchip Technology", "Microchip|MCHP", "Semiconductors", "Americas", "\"Microchip Technology\" OR MCHP"],
+  ["ON Semiconductor", "onsemi|ON Semiconductor", "Semiconductors", "Americas"],
+  ["Skyworks", "Skyworks|SWKS", "Semiconductors", "Americas"],
+  ["Qorvo", "Qorvo|QRVO", "Semiconductors", "Americas"],
+  ["Silicon Labs", "Silicon Labs|SLAB", "Semiconductors", "Americas"],
+  ["Lattice Semiconductor", "Lattice Semiconductor|LSCC", "Semiconductors", "Americas"],
+  ["Wolfspeed", "Wolfspeed", "Semiconductors", "Americas"],
+  ["Cirrus Logic", "Cirrus Logic", "Semiconductors", "Americas"],
+  ["Synaptics", "Synaptics", "Semiconductors", "Americas"],
+  ["Ambarella", "Ambarella", "Semiconductors", "Americas"],
+  ["Monolithic Power Systems", "Monolithic Power|MPWR", "Semiconductors", "Americas"],
+  ["Rambus", "Rambus", "Semiconductors", "Americas"],
+  ["Astera Labs", "Astera Labs", "Semiconductors", "Americas"],
+  ["Cerebras", "Cerebras", "Semiconductors", "Americas"],
+  ["GlobalFoundries", "GlobalFoundries|GFS", "Semiconductors", "Americas"],
+  ["TSMC", "TSMC|Taiwan Semiconductor", "Semiconductors", "APAC"],
+  ["Samsung Electronics", "Samsung", "Semiconductors", "APAC", "Samsung Electronics OR Samsung chip OR Samsung Galaxy"],
+  ["SK Hynix", "SK Hynix|SK hynix", "Semiconductors", "APAC"],
+  ["MediaTek", "MediaTek", "Semiconductors", "APAC"],
+  ["Realtek", "Realtek", "Semiconductors", "APAC"],
+  ["UMC", "UMC|United Microelectronics", "Semiconductors", "APAC", "UMC chip OR \"United Microelectronics\""],
+  ["Renesas", "Renesas", "Semiconductors", "APAC"],
+  ["Sony Semiconductor", "Sony Semiconductor|Sony chip|Sony image sensor", "Semiconductors", "APAC"],
+  ["Kioxia", "Kioxia", "Semiconductors", "APAC"],
+  ["Rapidus", "Rapidus", "Semiconductors", "APAC"],
+  ["Infineon", "Infineon", "Semiconductors", "Europe"],
+  ["STMicroelectronics", "STMicroelectronics|STMicro", "Semiconductors", "Europe"],
+  ["Nordic Semiconductor", "Nordic Semiconductor", "Semiconductors", "Europe"],
+  ["Arm Holdings", "Arm Holdings|Arm chip designer", "Semiconductors", "Europe", "\"Arm Holdings\""],
+  ["Ceva", "Ceva|CEVA", "Semiconductors", "Americas", "\"Ceva Inc\" OR CEVA DSP"],
+  ["SMIC", "SMIC|Semiconductor Manufacturing International", "Semiconductors", "China"],
+  ["Huawei HiSilicon", "HiSilicon", "Semiconductors", "China"],
+  ["Espressif", "Espressif", "Semiconductors", "China"],
+  ["Unisoc", "Unisoc", "Semiconductors", "China"],
+  ["Airoha", "Airoha", "Semiconductors", "APAC"],
+  ["Hon Hai (Foxconn)", "Foxconn|Hon Hai", "Electronics manufacturing", "APAC"],
+  // Semiconductor equipment
+  ["ASML", "ASML", "Semiconductor equipment", "Europe"],
+  ["Applied Materials", "Applied Materials|AMAT", "Semiconductor equipment", "Americas"],
+  ["Lam Research", "Lam Research", "Semiconductor equipment", "Americas"],
+  ["KLA", "KLA Corp|KLAC", "Semiconductor equipment", "Americas", "\"KLA Corporation\" OR KLAC"],
+  ["Tokyo Electron", "Tokyo Electron", "Semiconductor equipment", "APAC"],
+  ["Advantest", "Advantest", "Semiconductor equipment", "APAC"],
+  ["Teradyne", "Teradyne", "Semiconductor equipment", "Americas"],
+  ["Keysight", "Keysight", "Test & measurement", "Americas"],
+  ["Synopsys", "Synopsys", "EDA & IP", "Americas"],
+  ["Cadence Design Systems", "Cadence Design|CDNS", "EDA & IP", "Americas"],
+  // Big tech & software
+  ["Microsoft", "Microsoft|MSFT|Azure", "Software & cloud", "Americas"],
+  ["Apple", "Apple Inc|iPhone|Apple", "Hardware & devices", "Americas", "\"Apple Inc\" OR iPhone OR \"Apple Watch\" OR Mac"],
+  ["Alphabet (Google)", "Google|Alphabet|Gemini", "Internet & platforms", "Americas", "Google OR Alphabet OR Gemini AI"],
+  ["Amazon", "Amazon|AWS", "Internet & platforms", "Americas", "Amazon OR AWS"],
+  ["Meta Platforms", "Meta Platforms|Meta|Instagram|WhatsApp", "Internet & platforms", "Americas", "\"Meta Platforms\" OR Zuckerberg OR Instagram OR WhatsApp"],
+  ["Oracle", "Oracle|ORCL", "Software & cloud", "Americas"],
+  ["Salesforce", "Salesforce|CRM", "Software & cloud", "Americas"],
+  ["Adobe", "Adobe|ADBE", "Software & cloud", "Americas"],
+  ["IBM", "IBM", "IT services", "Americas"],
+  ["SAP", "SAP", "Software & cloud", "Europe", "SAP SE OR SAP software"],
+  ["ServiceNow", "ServiceNow|NOW", "Software & cloud", "Americas"],
+  ["Workday", "Workday", "Software & cloud", "Americas"],
+  ["Snowflake", "Snowflake", "Software & cloud", "Americas", "Snowflake data cloud OR SNOW stock"],
+  ["Datadog", "Datadog", "Software & cloud", "Americas"],
+  ["Palantir", "Palantir|PLTR", "Software & cloud", "Americas"],
+  ["Atlassian", "Atlassian", "Software & cloud", "APAC"],
+  ["Shopify", "Shopify", "Software & cloud", "Americas"],
+  ["Intuit", "Intuit", "Software & cloud", "Americas"],
+  ["Autodesk", "Autodesk", "Software & cloud", "Americas"],
+  ["Cisco", "Cisco|CSCO", "Networking & telecom", "Americas"],
+  ["Dell Technologies", "Dell Technologies|Dell", "Hardware & devices", "Americas"],
+  ["HP Inc", "HP Inc|HP", "Hardware & devices", "Americas", "\"HP Inc\""],
+  ["Hewlett Packard Enterprise", "Hewlett Packard Enterprise|HPE", "Hardware & devices", "Americas"],
+  ["Super Micro Computer", "Super Micro|Supermicro|SMCI", "Hardware & devices", "Americas"],
+  ["Zoom", "Zoom Communications|Zoom Video", "Software & cloud", "Americas", "\"Zoom Communications\" OR \"Zoom Video\""],
+  ["Twilio", "Twilio", "Software & cloud", "Americas"],
+  ["MongoDB", "MongoDB", "Software & cloud", "Americas"],
+  ["Elastic", "Elastic N.V.|Elasticsearch", "Software & cloud", "Americas", "Elastic NV OR Elasticsearch"],
+  ["UiPath", "UiPath", "Software & cloud", "Americas"],
+  ["C3.ai", "C3.ai", "AI", "Americas"],
+  ["HubSpot", "HubSpot", "Software & cloud", "Americas"],
+  ["Dropbox", "Dropbox", "Software & cloud", "Americas"],
+  ["DocuSign", "DocuSign", "Software & cloud", "Americas"],
+  ["Unity Software", "Unity Software|Unity Technologies", "Software & cloud", "Americas"],
+  ["Roblox", "Roblox", "Internet & platforms", "Americas"],
+  ["Epic Games", "Epic Games", "Internet & platforms", "Americas"],
+  ["Electronic Arts", "Electronic Arts|EA Sports", "Internet & platforms", "Americas"],
+  ["Take-Two Interactive", "Take-Two|GTA", "Internet & platforms", "Americas"],
+  // AI
+  ["OpenAI", "OpenAI|ChatGPT", "AI", "Americas"],
+  ["Anthropic", "Anthropic|Claude", "AI", "Americas", "Anthropic OR \"Claude AI\""],
+  ["xAI", "xAI|Grok", "AI", "Americas", "xAI OR Grok chatbot"],
+  ["Mistral AI", "Mistral AI|Mistral", "AI", "Europe", "\"Mistral AI\""],
+  ["Cohere", "Cohere", "AI", "Americas", "Cohere AI"],
+  ["Perplexity", "Perplexity", "AI", "Americas", "Perplexity AI"],
+  ["Hugging Face", "Hugging Face", "AI", "Americas"],
+  ["Databricks", "Databricks", "AI", "Americas"],
+  ["Scale AI", "Scale AI", "AI", "Americas"],
+  ["CoreWeave", "CoreWeave", "AI", "Americas"],
+  ["Nebius", "Nebius", "AI", "Europe"],
+  ["DeepSeek", "DeepSeek", "AI", "China"],
+  ["Moonshot AI (Kimi)", "Moonshot AI|Kimi", "AI", "China"],
+  ["Zhipu AI", "Zhipu", "AI", "China"],
+  ["SenseTime", "SenseTime", "AI", "China"],
+  ["Stability AI", "Stability AI", "AI", "Europe"],
+  ["Sakana AI", "Sakana AI", "AI", "APAC"],
+  ["Sarvam AI", "Sarvam AI", "AI", "APAC"],
+  // Cybersecurity
+  ["CrowdStrike", "CrowdStrike", "Cybersecurity", "Americas"],
+  ["Palo Alto Networks", "Palo Alto Networks|PANW", "Cybersecurity", "Americas"],
+  ["Fortinet", "Fortinet", "Cybersecurity", "Americas"],
+  ["Zscaler", "Zscaler", "Cybersecurity", "Americas"],
+  ["Okta", "Okta", "Cybersecurity", "Americas"],
+  ["Cloudflare", "Cloudflare", "Cybersecurity", "Americas"],
+  ["SentinelOne", "SentinelOne", "Cybersecurity", "Americas"],
+  ["Check Point", "Check Point", "Cybersecurity", "Europe", "\"Check Point Software\""],
+  ["Wiz", "Wiz security|Wiz cloud", "Cybersecurity", "Americas", "Wiz cloud security"],
+  // Networking & telecom
+  ["Ericsson", "Ericsson", "Networking & telecom", "Europe"],
+  ["Nokia", "Nokia", "Networking & telecom", "Europe"],
+  ["Juniper Networks", "Juniper Networks|Juniper", "Networking & telecom", "Americas"],
+  ["Arista Networks", "Arista", "Networking & telecom", "Americas"],
+  ["Ubiquiti", "Ubiquiti", "Networking & telecom", "Americas"],
+  ["Netgear", "Netgear", "Networking & telecom", "Americas"],
+  ["TP-Link", "TP-Link", "Networking & telecom", "China"],
+  ["Extreme Networks", "Extreme Networks", "Networking & telecom", "Americas"],
+  ["CommScope", "CommScope", "Networking & telecom", "Americas"],
+  ["Ciena", "Ciena", "Networking & telecom", "Americas"],
+  ["Huawei", "Huawei", "Networking & telecom", "China"],
+  ["ZTE", "ZTE", "Networking & telecom", "China"],
+  ["Starlink", "Starlink", "Space & satellite", "Americas"],
+  ["SpaceX", "SpaceX", "Space & satellite", "Americas"],
+  ["Wi-Fi Alliance & Bluetooth SIG", "Wi-Fi Alliance|Bluetooth SIG", "Standards bodies", "Americas", "\"Wi-Fi Alliance\" OR \"Bluetooth SIG\""],
+  ["Reliance Jio", "Jio|Reliance Jio", "Networking & telecom", "APAC"],
+  ["Bharti Airtel", "Airtel", "Networking & telecom", "APAC"],
+  ["Vodafone", "Vodafone", "Networking & telecom", "Europe"],
+  ["Deutsche Telekom", "Deutsche Telekom|T-Mobile", "Networking & telecom", "Europe"],
+  // Devices & electronics
+  ["Sony", "Sony|PlayStation", "Hardware & devices", "APAC"],
+  ["LG Electronics", "LG Electronics|LG", "Hardware & devices", "APAC", "\"LG Electronics\""],
+  ["Xiaomi", "Xiaomi", "Hardware & devices", "China"],
+  ["Lenovo", "Lenovo", "Hardware & devices", "China"],
+  ["ASUS", "ASUS|Asus", "Hardware & devices", "APAC"],
+  ["Acer", "Acer", "Hardware & devices", "APAC"],
+  ["OnePlus", "OnePlus", "Hardware & devices", "China"],
+  ["OPPO", "OPPO|Oppo", "Hardware & devices", "China"],
+  ["vivo", "vivo|Vivo", "Hardware & devices", "China", "vivo smartphone"],
+  ["Honor", "Honor", "Hardware & devices", "China", "Honor smartphone OR Honor Magic"],
+  ["Nothing", "Nothing Phone|Carl Pei", "Hardware & devices", "Europe", "\"Nothing Phone\" OR \"Carl Pei\""],
+  ["Garmin", "Garmin", "Hardware & devices", "Americas"],
+  ["Fitbit", "Fitbit", "Hardware & devices", "Americas"],
+  ["Oura", "Oura", "Hardware & devices", "Europe", "Oura ring"],
+  ["GoPro", "GoPro", "Hardware & devices", "Americas"],
+  ["Sonos", "Sonos", "Hardware & devices", "Americas"],
+  ["Bose", "Bose", "Hardware & devices", "Americas"],
+  ["JBL (Harman)", "JBL|Harman", "Hardware & devices", "Americas"],
+  ["Logitech", "Logitech", "Hardware & devices", "Europe"],
+  ["Nintendo", "Nintendo", "Hardware & devices", "APAC"],
+  ["Panasonic", "Panasonic", "Hardware & devices", "APAC"],
+  ["Canon", "Canon", "Hardware & devices", "APAC"],
+  ["Murata", "Murata", "Electronic components", "APAC"],
+  ["TDK", "TDK", "Electronic components", "APAC"],
+  ["Foxconn Industrial Internet", "Foxconn Industrial", "Electronics manufacturing", "China"],
+  ["Flex", "Flex Ltd|Flextronics", "Electronics manufacturing", "Americas"],
+  ["Jabil", "Jabil", "Electronics manufacturing", "Americas"],
+  // Internet & platforms (global)
+  ["Netflix", "Netflix", "Internet & platforms", "Americas"],
+  ["Spotify", "Spotify", "Internet & platforms", "Europe"],
+  ["Uber", "Uber", "Internet & platforms", "Americas"],
+  ["Airbnb", "Airbnb", "Internet & platforms", "Americas"],
+  ["DoorDash", "DoorDash", "Internet & platforms", "Americas"],
+  ["Pinterest", "Pinterest", "Internet & platforms", "Americas"],
+  ["Snap", "Snap Inc|Snapchat", "Internet & platforms", "Americas"],
+  ["Reddit", "Reddit", "Internet & platforms", "Americas"],
+  ["X (Twitter)", "Twitter|X Corp", "Internet & platforms", "Americas", "\"X Corp\" OR Twitter OR \"X platform\""],
+  ["Tesla", "Tesla|TSLA", "Electronics & EV", "Americas"],
+  ["Rivian", "Rivian", "Electronics & EV", "Americas"],
+  ["BYD", "BYD", "Electronics & EV", "China"],
+  ["Waymo", "Waymo", "Electronics & EV", "Americas"],
+  ["Tencent", "Tencent|WeChat", "Internet & platforms", "China"],
+  ["Alibaba", "Alibaba|Alipay", "Internet & platforms", "China"],
+  ["Baidu", "Baidu", "Internet & platforms", "China"],
+  ["ByteDance (TikTok)", "ByteDance|TikTok", "Internet & platforms", "China"],
+  ["JD.com", "JD.com", "Internet & platforms", "China"],
+  ["Meituan", "Meituan", "Internet & platforms", "China"],
+  ["PDD (Temu)", "PDD|Temu|Pinduoduo", "Internet & platforms", "China"],
+  ["NetEase", "NetEase", "Internet & platforms", "China"],
+  ["Kuaishou", "Kuaishou", "Internet & platforms", "China"],
+  ["Xiaohongshu", "Xiaohongshu|RedNote", "Internet & platforms", "China"],
+  ["Naver", "Naver", "Internet & platforms", "APAC"],
+  ["Kakao", "Kakao", "Internet & platforms", "APAC"],
+  ["SoftBank", "SoftBank", "Investment & telecom", "APAC"],
+  ["Rakuten", "Rakuten", "Internet & platforms", "APAC"],
+  ["Grab", "Grab Holdings|Grab", "Internet & platforms", "APAC", "\"Grab Holdings\" OR Grab Singapore"],
+  ["Sea Limited (Shopee)", "Sea Limited|Shopee", "Internet & platforms", "APAC"],
+  ["GoTo", "GoTo Group|Gojek|Tokopedia", "Internet & platforms", "APAC"],
+  ["Flipkart", "Flipkart", "Internet & platforms", "APAC"],
+  ["Zomato (Eternal)", "Zomato|Eternal", "Internet & platforms", "APAC", "Zomato OR \"Eternal Ltd\""],
+  ["Swiggy", "Swiggy", "Internet & platforms", "APAC"],
+  ["Paytm", "Paytm", "Fintech", "APAC"],
+  ["PhonePe", "PhonePe", "Fintech", "APAC"],
+  ["Zepto", "Zepto", "Internet & platforms", "APAC"],
+  ["Ola Electric", "Ola Electric", "Electronics & EV", "APAC"],
+  ["Nykaa", "Nykaa", "Internet & platforms", "APAC"],
+  ["Mercado Libre", "Mercado Libre|MercadoLibre", "Internet & platforms", "Americas"],
+  ["Nubank", "Nubank", "Fintech", "Americas"],
+  ["Prosus", "Prosus|Naspers", "Internet & platforms", "Europe"],
+  ["Zalando", "Zalando", "Internet & platforms", "Europe"],
+  ["Adyen", "Adyen", "Fintech", "Europe"],
+  ["Klarna", "Klarna", "Fintech", "Europe"],
+  ["Revolut", "Revolut", "Fintech", "Europe"],
+  ["Stripe", "Stripe", "Fintech", "Americas", "Stripe payments"],
+  ["PayPal", "PayPal", "Fintech", "Americas"],
+  ["Block (Square)", "Block Inc|Square|Cash App", "Fintech", "Americas", "\"Block Inc\" OR \"Cash App\" OR Square payments"],
+  ["Coinbase", "Coinbase", "Fintech", "Americas"],
+  ["Robinhood", "Robinhood", "Fintech", "Americas"],
+  // IT services
+  ["Infosys", "Infosys", "IT services", "APAC"],
+  ["TCS", "TCS|Tata Consultancy", "IT services", "APAC"],
+  ["Wipro", "Wipro", "IT services", "APAC"],
+  ["HCLTech", "HCLTech|HCL Tech", "IT services", "APAC"],
+  ["Tech Mahindra", "Tech Mahindra", "IT services", "APAC"],
+  ["Zoho", "Zoho", "Software & cloud", "APAC"],
+  ["Accenture", "Accenture", "IT services", "Europe"],
+  ["Capgemini", "Capgemini", "IT services", "Europe"],
+  ["Cognizant", "Cognizant", "IT services", "Americas"],
+  ["Fujitsu", "Fujitsu", "IT services", "APAC"],
+  ["NEC", "NEC Corp|NEC", "IT services", "APAC", "\"NEC Corporation\""],
+  ["Hitachi", "Hitachi", "IT services", "APAC"],
+  // Space, defence & robotics tech
+  ["Anduril", "Anduril", "Defence tech", "Americas"],
+  ["Boston Dynamics", "Boston Dynamics", "Robotics", "Americas"],
+  ["Figure AI", "Figure AI", "Robotics", "Americas"],
+  ["Unitree", "Unitree", "Robotics", "China"],
+  ["Blue Origin", "Blue Origin", "Space & satellite", "Americas"],
+  ["Rocket Lab", "Rocket Lab", "Space & satellite", "Americas"],
+  ["ISRO", "ISRO", "Space & satellite", "APAC"],
+  ["Quantum Computing (IonQ, D-Wave)", "IonQ|D-Wave|Rigetti|PsiQuantum", "Quantum computing", "Americas"],
+];
+
+const slug = (s) => s.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+export const SHARDS = 10;
+export const COMPANIES = LIST.map(([name, terms, sector, region, q], i) => {
+  const t = terms.split("|");
+  return { id: slug(name), name, terms: t, sector, region, k: i % SHARDS, q: q || t.map((x) => `"${x}"`).join(" OR ") };
+});
+
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function matcher(c) {
+  const strong = c.terms.filter((t) => t.length > 4).map(esc);
+  const weak = c.terms.filter((t) => t.length <= 4).map(esc);
+  const a = strong.length ? new RegExp(`(?<![\\w])(?:${strong.join("|")})(?![\\w])`, "i") : null;
+  const b = weak.length ? new RegExp(`(?<![\\w])(?:${weak.join("|")})(?![\\w])`) : null;
+  return (title) => (a && a.test(title)) || (b && b.test(title));
+}
+
+async function pool(tasks, size) {
+  const out = [];
+  let i = 0;
+  await Promise.all(Array.from({ length: size }, async () => {
+    while (i < tasks.length) { const n = i++; out[n] = await tasks[n](); }
+  }));
+  return out;
+}
+
+async function refresh(c, previous) {
+  const match = matcher(c);
+  const raw = await fetchFeed({ url: googleUrl(`(${c.q})`, { when: "30d" }), kind: "google", max: 70 });
+  const items = dedupe(raw.filter((n) => match(n.t)).sort((a, b) => b.d.localeCompare(a.d)))
+    .slice(0, 30).map((n) => ({ t: n.t, u: n.u, s: n.s, d: n.d }));
+  return items.length ? items : previous || [];
+}
+
+export const companyIndex = () => COMPANIES.map((c) => ({ id: c.id, n: c.name, t: c.terms, s: c.sector, r: c.region, k: c.k }));
+
+// Refreshes the shard's companies (or keeps the previous file) and returns the shard payload.
+export async function buildShard(k, prev) {
+  const mine = COMPANIES.filter((c) => c.k === k);
+  const items = await pool(mine.map((c) => () => refresh(c, prev?.companies?.[c.id]?.items)), 6);
+  return { companies: Object.fromEntries(mine.map((c, i) => [c.id, { items: items[i] }])) };
+}

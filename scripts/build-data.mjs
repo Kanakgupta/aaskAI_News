@@ -5,6 +5,7 @@ import { fetchFeed, dedupe } from "../src/rss.js";
 import { buildTech } from "../src/tech.js";
 import { buildMarkets } from "../src/markets.js";
 import { buildPredictions } from "../src/predictions.js";
+import { SHARDS, companyIndex, buildShard } from "../src/companies.js";
 
 const OUT = new URL("../public/data/", import.meta.url);
 const SITE = (process.env.SITE_URL || "").replace(/\/?$/, "/");
@@ -47,7 +48,27 @@ async function publish(name, build, ok) {
   await writeFile(new URL(`${name}.json`, OUT), JSON.stringify(body));
 }
 
+// Company news is split into shards; each run refreshes two of them in rotation (all of them locally) and republishes the rest unchanged.
+async function publishCompanies() {
+  const write = (name, body) => writeFile(new URL(`${name}.json`, OUT), JSON.stringify(body));
+  await write("companies-index", { generated: new Date().toISOString(), companies: companyIndex() });
+  const half = SHARDS / 2;
+  const slot = Math.floor(Date.now() / 3e5) % half;
+  for (let k = 0; k < SHARDS; k++) {
+    const prev = await previous(`co-${k}`);
+    if (SITE && prev && k % half !== slot) { await write(`co-${k}`, prev); continue; }
+    try {
+      await write(`co-${k}`, { generated: new Date().toISOString(), ...(await buildShard(k, prev)) });
+      console.log(`co-${k}: fresh`);
+    } catch (e) {
+      console.warn(`co-${k}: ${e.message}`);
+      if (prev) await write(`co-${k}`, prev);
+    }
+  }
+}
+
 const jobs = [
+  publishCompanies(),
   ...Object.keys(CATEGORIES).map((id) => publish(`news-${id}`, () => buildCategory(id), (b) => b.items.length)),
   publish("news-tech", buildTech, (b) => b.items.length),
   publish("markets", buildMarkets, (b) => b.quotes.length),
