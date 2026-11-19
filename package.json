@@ -1,0 +1,9 @@
+{
+  "name": "aaskai-news",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "data": "node scripts/build-data.mjs",
+    "serve": "node scripts/serve.mjs"
+  }
+}

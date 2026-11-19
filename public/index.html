@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>aaskAI News — live headlines on markets, tech, AI, world and predictions</title>
+<meta name="description" content="aaskAI News: live news fetched in real time — stock market, technology, AI, world, politics, predictions, crypto, science, health, sports and entertainment.">
+<meta name="theme-color" content="#070b16">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src * data:; connect-src 'self'; base-uri 'none'; object-src 'none'">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#view">Skip to news</a>
+<header class="hero">
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="wrap">
+    <a class="brand" href="#/home" aria-label="aaskAI News home">aask<span>AI</span> News</a>
+    <p class="tag">Live news, refreshed automatically every few minutes.</p>
+    <div class="status" id="status" aria-live="polite"><span class="dot"></span><span id="statusText">Fetching latest headlines…</span></div>
+  </div>
+</header>
+<nav class="catnav" aria-label="News categories">
+  <div class="wrap navrow">
+    <div class="cats" id="cats" role="tablist"></div>
+    <form class="search" id="searchForm" role="search" autocomplete="off">
+      <input id="q" type="search" placeholder="Search all news…" aria-label="Search all news">
+    </form>
+  </div>
+</nav>
+<main class="wrap" id="view" tabindex="-1"></main>
+<button class="pill-new" id="newPill" hidden>New stories available — refresh</button>
+<footer class="foot">
+  <div class="wrap">
+    <p><b>aaskAI News</b> aggregates headlines and snippets from public RSS feeds; every story links to its original publisher. Nothing here is financial, medical or legal advice.</p>
+  </div>
+</footer>
+<script src="assets/app.js" defer></script>
+</body>
+</html>
