@@ -181,8 +181,13 @@ const skeletons = (n, cards = false) => Array.from({ length: n }, () => cards
 
 // ---------- helpers
 const ageDays = (n) => (Date.now() - new Date(n.d).getTime()) / 864e5;
+// The landing page shows US stock news; the Stock Market page itself offers both India and USA.
+const homeItems = (id) => {
+  const items = store[id === "stocks" ? "stocksus" : id]?.items || [];
+  return id === "stocks" ? items.filter((n) => !STOCK_HIDE.has(n.g) && n.g !== "EARNINGS") : items;
+};
 function topItems(id, n) {
-  return (store[id]?.items || []).slice(0, n);
+  return homeItems(id).slice(0, n);
 }
 
 // ---------- routing
@@ -214,7 +219,7 @@ function render() {
 function onData(id) {
   updateStatus();
   if (!rendered) return;
-  if (route.name === "home") { fillBlock(id); fillLead(); fillTicker(); fillTrending(); fillGlance(); }
+  if (route.name === "home") { fillBlock(id === "stocksus" ? "stocks" : id); fillLead(); fillTicker(); fillTrending(); fillGlance(); }
   else if (route.name === "cat" && (route.sid || route.cat) === id) {
     if (window.scrollY < 300 || !route.drawn) drawCat(); else $("#newPill").hidden = false;
   } else if (route.name === "search") drawSearch();
@@ -233,7 +238,7 @@ function renderHome() {
     <div id="lead"></div>
     <div class="home-grid">
       <div class="blocks">${CATS.map((c) => `<section class="block" data-cat="${c.id}" style="--h:${c.hue}">
-        <header><h2><a href="#/${c.id}">${esc(c.label)}</a></h2><a class="more" href="#/${c.id}">View all →</a></header>
+        <header><h2><a href="#/${c.id}">${esc(c.label)}</a></h2><a class="more" href="#/${c.id === "stocks" ? "stocks/usa" : c.id}">View all →</a></header>
         <ul class="rows" id="blk-${c.id}"></ul></section>`).join("")}</div>
       <aside class="side">
         <section class="card"><h3>Markets snapshot</h3><div id="mkts"><i class="sk"></i><i class="sk"></i><i class="sk"></i></div><div id="mood"></div></section>
@@ -252,7 +257,7 @@ function fillBlock(id) {
   if (!ul) return;
   const items = topItems(id, 5);
   if (!items.length) {
-    ul.innerHTML = failed[id] ? '<li class="empty">Could not load — retrying shortly.</li>' : skeletons(4);
+    ul.innerHTML = failed[id === "stocks" ? "stocksus" : id] ? '<li class="empty">Could not load — retrying shortly.</li>' : skeletons(4);
     return;
   }
   ul.innerHTML = items.map((n, i) => row(n, { img: i === 0, tag: id === "stocks" ? n.g : "" })).join("");
@@ -262,7 +267,7 @@ function fillLead() {
   const host = $("#lead");
   if (!host) return;
   const order = ["world", "stocks", "ai", "politics", "science", "entertainment", "sports"];
-  const pool = order.flatMap((id) => (store[id]?.items || []).slice(0, 4).filter((n) => n.i).map((n) => ({ n, id })))
+  const pool = order.flatMap((id) => homeItems(id).slice(0, 4).filter((n) => n.i).map((n) => ({ n, id })))
     .filter((x) => ageDays(x.n) < 2 && !/investing|seeking/i.test(x.n.s)).sort((a, b) => b.n.d.localeCompare(a.n.d));
   const pick = pool[0];
   if (!pick) { host.innerHTML = ""; return; }
@@ -289,7 +294,7 @@ function fillTrending() {
   const cutoff = Date.now() - 36e5 * 36;
   for (const c of CATS) {
     if (c.id === "tech") continue;
-    for (const n of store[c.id]?.items || []) {
+    for (const n of homeItems(c.id)) {
       if (new Date(n.d).getTime() < cutoff) continue;
       const seen = new Set();
       for (const m of n.t.matchAll(/\b([A-Z][\w&.'-]*(?:\s+[A-Z][\w&.'-]*){0,2})\b/g)) {
@@ -312,7 +317,7 @@ function fillGlance() {
   if (!host) return;
   let stories = 0, last24 = 0;
   const pubs = new Set();
-  for (const c of CATS) for (const n of store[c.id]?.items || []) { stories++; pubs.add(n.s); if (ageDays(n) < 1) last24++; }
+  for (const c of CATS) for (const n of homeItems(c.id)) { stories++; pubs.add(n.s); if (ageDays(n) < 1) last24++; }
   host.innerHTML = `<div><b>${stories}</b><span>stories live</span></div><div><b>${last24}</b><span>in last 24h</span></div><div><b>${pubs.size}</b><span>publishers</span></div>`;
 }
 
