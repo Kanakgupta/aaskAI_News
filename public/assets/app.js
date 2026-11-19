@@ -519,10 +519,9 @@ function buildNav() {
 
 function updateStatus() {
   const times = Object.values(store).map((d) => new Date(d.generated).getTime()).filter(Boolean);
-  const loaded = CATS.filter((c) => store[c.id]).length;
   const el = $("#statusText");
   if (!times.length) { el.textContent = "Fetching latest headlines…"; return; }
-  el.textContent = `Live · ${loaded}/${CATS.length} sections loaded · updated ${ago(new Date(Math.max(...times)).toISOString())}`;
+  el.textContent = `Live · updated ${ago(new Date(Math.max(...times)).toISOString())}`;
 }
 
 document.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.remove(); }, true);
