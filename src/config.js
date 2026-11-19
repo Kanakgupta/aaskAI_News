@@ -23,9 +23,29 @@ export function stockRetag(item) {
 }
 
 export const CATEGORIES = {
+  // India market news: same filters and publisher mix as the HeRAI India news screener.
   stocks: {
-    label: "Stock Market",
-    blurb: "US market, macro, earnings and IPO headlines from major publishers, updated live.",
+    label: "Stock Market (India)",
+    tags: STOCK_TAGS,
+    feeds: [
+      rss("The Hindu National", "https://www.thehindu.com/news/national/feeder/default.rss", { tag: "POLITICAL", max: 50 }),
+      rss("LiveMint News", "https://www.livemint.com/rss/news", { tag: "BUSINESS" }),
+      rss("Livemint Markets", "https://www.livemint.com/rss/markets", { tag: "MARKETS" }),
+      rss("Economic Times Markets", "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", { tag: "MARKETS", max: 50 }),
+      rss("Economic Times Economy", "https://economictimes.indiatimes.com/news/economy/rssfeeds/1373380680.cms", { tag: "MACRO" }),
+      rss("ET Technology", "https://economictimes.indiatimes.com/tech/rssfeeds/13357270.cms", { tag: "AI" }),
+      rss("Economic Times Companies", "https://economictimes.indiatimes.com/news/company/rssfeeds/2143429.cms", { tag: "EARNINGS" }),
+      rss("Business Standard Markets", "https://www.business-standard.com/rss/markets-106.rss", { tag: "MARKETS" }),
+      rss("Business Standard Companies", "https://www.business-standard.com/rss/companies-101.rss", { tag: "EARNINGS" }),
+      rss("Business Standard Tech", "https://www.business-standard.com/rss/technology-108.rss", { tag: "AI" }),
+      rss("Business Today", "https://www.businesstoday.in/rss/latest", { tag: "BUSINESS", max: 50 }),
+      gn("Google News India IPO", "India IPO", { tag: "IPO" }),
+      gn("Google News NSE IPO", "NSE IPO", { tag: "IPO" }),
+    ],
+  },
+  // US market news: same filters and publisher mix as the HeRAI USA news screener.
+  stocksus: {
+    label: "Stock Market (USA)",
     tags: STOCK_TAGS,
     retag: stockRetag,
     feeds: [

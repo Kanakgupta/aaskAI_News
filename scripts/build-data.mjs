@@ -15,7 +15,7 @@ async function buildCategory(id) {
   let items = (await Promise.all(cat.feeds.map(fetchFeed))).flat();
   if (cat.retag) items = items.map(cat.retag);
   items.sort((a, b) => b.d.localeCompare(a.d));
-  items = dedupe(items).slice(0, 200).map(({ su, ed, ...rest }) => rest);
+  items = dedupe(items).slice(0, 400).map(({ su, ed, ...rest }) => rest);
   return { items, tags: cat.tags ? cat.tags.map(([k, label]) => ({ id: k, label })) : [] };
 }
 

@@ -2,7 +2,7 @@
 "use strict";
 
 const CATS = [
-  { id: "stocks", label: "Stock Market", hue: 150, blurb: "US market, macro, earnings and IPO headlines from major publishers, updated live." },
+  { id: "stocks", label: "Stock Market", hue: 150, blurb: "India and US market, macro, earnings and IPO headlines from major publishers, updated live." },
   { id: "tech", label: "Technology", hue: 200, blurb: "The wireless newsroom: Wi-Fi, Bluetooth, UWB / Matter / NearLink and the business around them — de-duplicated, clustered and ranked." },
   { id: "ai", label: "AI", hue: 265, blurb: "Models, labs, chips, startups and policy." },
   { id: "world", label: "World", hue: 35, blurb: "Global headlines from international broadcasters and wires." },
@@ -15,6 +15,7 @@ const CATS = [
   { id: "entertainment", label: "Entertainment", hue: 320, blurb: "Film, TV, music and culture." },
 ];
 const CAT = Object.fromEntries(CATS.map((c) => [c.id, c]));
+const EXTRA = ["stocksus"];
 const STORE_V = "aask:v1:";
 const store = {};
 const failed = {};
@@ -75,7 +76,7 @@ function loadAux(name) {
 
 function loadAll() {
   const first = route.cat && CAT[route.cat] ? [route.cat] : [];
-  const order = [...first, ...CATS.map((c) => c.id).filter((id) => !first.includes(id))];
+  const order = [...first, ...CATS.map((c) => c.id).filter((id) => !first.includes(id)), ...EXTRA];
   order.forEach(loadCat);
   loadAux("markets");
   loadAux("predictions");
@@ -150,6 +151,7 @@ function parseRoute() {
   const h = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
   if (!h || h === "home") return { name: "home" };
   if (h.startsWith("search/")) return { name: "search", q: h.slice(7) };
+  if (h === "stocks/usa") return { name: "cat", cat: "stocks", market: "usa" };
   if (CAT[h]) return { name: "cat", cat: h };
   return { name: "home" };
 }
@@ -174,7 +176,7 @@ function onData(id) {
   updateStatus();
   if (!rendered) return;
   if (route.name === "home") { fillBlock(id); fillLead(); fillTicker(); fillTrending(); fillGlance(); }
-  else if (route.name === "cat" && route.cat === id) {
+  else if (route.name === "cat" && (route.sid || route.cat) === id) {
     if (window.scrollY < 300 || !route.drawn) drawCat(); else $("#newPill").hidden = false;
   } else if (route.name === "search") drawSearch();
 }
@@ -332,6 +334,7 @@ function pageShell(c, extra = "") {
 }
 
 function renderCat() {
+  if (route.cat === "stocks") return renderStocks();
   const c = CAT[route.cat];
   pageShell(c, c.id === "prediction" ? '<div class="odds-grid" id="oddsGrid"></div>' : "");
   route.filter = "";
@@ -343,6 +346,61 @@ function renderCat() {
   disposers.push(() => document.removeEventListener("click", covToggle));
 }
 
+// ---------- STOCK MARKET (India / USA): mirrors the HeRAI news screener layout
+const hAgo = (iso) => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 6e4));
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 6) return `${h}h ${m % 60}m ago`;
+  if (h < 24) return `${h} hours ago`;
+  return `${Math.floor(h / 24)} days ago`;
+};
+
+function hrow(n) {
+  const img = n.i ? `<img class="hthumb" src="${esc(n.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : "";
+  return `<li class="hitem"><div class="hbody"><div class="hmeta"><span class="htag">${esc(n.g)}</span><span class="hsrc">${esc(n.s)}</span><span class="htime">${hAgo(n.d)}</span></div>
+    <a class="htitle" href="${esc(safe(n.u))}" target="_blank" rel="noopener noreferrer">${esc(n.t)}</a>${n.x ? `<p class="hdesc">${esc(n.x)}</p>` : ""}</div>${img}</li>`;
+}
+
+function renderStocks() {
+  const us = route.market === "usa";
+  const name = us ? "USA" : "India";
+  route.sid = us ? "stocksus" : "stocks";
+  route.filter = "";
+  route.drawn = false;
+  view.innerHTML = `<section class="page herai">
+    <div class="mkt"><a class="mk${us ? "" : " on"}" href="#/stocks">India</a><a class="mk${us ? " on" : ""}" href="#/stocks/usa">USA</a></div>
+    <div class="crumb"><a href="#/home">Home</a> / News</div>
+    <h1>${name} Market News screener</h1>
+    <p class="hlead">Latest ${name} Stock Screener market, technology, and macro headlines aggregated from major publishers. Updated live in your browser.</p>
+    <div class="hcard"><div class="hpills" id="filters"></div>
+      <div class="hstatus"><span id="cnt">Loading feeds…</span><button class="hbtn" id="refresh" type="button">↻ Refresh</button></div>
+      <div id="list"></div></div></section>`;
+  $("#refresh").onclick = () => { $("#cnt").textContent = "Refreshing…"; route.drawn = false; loadCat(route.sid); };
+  drawStocks();
+}
+
+function drawStocks() {
+  const id = route.sid;
+  const d = store[id];
+  const list = $("#list");
+  if (!list) return;
+  if (!d) {
+    $("#filters").innerHTML = "";
+    list.innerHTML = failed[id] ? '<div class="err">Could not load this feed right now. <button class="hbtn" id="retry" type="button">Retry</button></div>' : `<ul class="rows">${skeletons(6)}</ul>`;
+    const r = $("#retry"); if (r) r.onclick = () => { failed[id] = false; drawStocks(); loadCat(id); };
+    return;
+  }
+  route.drawn = true;
+  $("#newPill").hidden = true;
+  const f = $("#filters");
+  f.innerHTML = [{ id: "", label: "All" }, ...(d.tags || [])].map((c) => `<button class="hpill${route.filter === c.id ? " on" : ""}" data-f="${esc(c.id)}" type="button">${esc(c.label)}</button>`).join("");
+  f.onclick = (e) => { const b = e.target.closest("[data-f]"); if (b) { route.filter = b.dataset.f; drawStocks(); } };
+  const items = d.items.filter((n) => !route.filter || n.g === route.filter);
+  $("#cnt").textContent = `${items.length} stories · updated ${hAgo(d.generated)}`;
+  mountList(list, items, hrow);
+}
+
 function covToggle(e) {
   const b = e.target.closest("[data-cov]");
   if (!b) return;
@@ -352,6 +410,7 @@ function covToggle(e) {
 }
 
 function drawCat() {
+  if (route.sid) return drawStocks();
   const id = route.cat;
   const d = store[id];
   const list = $("#list");
@@ -449,7 +508,7 @@ function buildNav() {
 
 function updateStatus() {
   const times = Object.values(store).map((d) => new Date(d.generated).getTime()).filter(Boolean);
-  const loaded = Object.keys(store).length;
+  const loaded = CATS.filter((c) => store[c.id]).length;
   const el = $("#statusText");
   if (!times.length) { el.textContent = "Fetching latest headlines…"; return; }
   el.textContent = `Live · ${loaded}/${CATS.length} sections loaded · updated ${ago(new Date(Math.max(...times)).toISOString())}`;
@@ -461,14 +520,14 @@ window.addEventListener("hashchange", render);
 
 // ---------- boot: paint cached data immediately, then fetch everything in parallel in the background
 buildNav();
-for (const c of CATS) { const d = readLocal(c.id); if (d?.items) store[c.id] = d; }
+for (const id of [...CATS.map((c) => c.id), ...EXTRA]) { const d = readLocal(id); if (d?.items) store[id] = d; }
 for (const k of Object.keys(aux)) aux[k] = readLocal(k);
 route = parseRoute();
 render();
 updateStatus();
 loadAll();
-setInterval(() => CATS.forEach((c) => loadCat(c.id)), 3 * 60 * 1000);
+setInterval(() => [...CATS.map((c) => c.id), ...EXTRA].forEach(loadCat), 3 * 60 * 1000);
 setInterval(() => { loadAux("markets"); loadAux("predictions"); }, 3 * 60 * 1000);
 setInterval(updateStatus, 30000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { CATS.forEach((c) => loadCat(c.id)); loadAux("markets"); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { [...CATS.map((c) => c.id), ...EXTRA].forEach(loadCat); loadAux("markets"); } });
 })();
