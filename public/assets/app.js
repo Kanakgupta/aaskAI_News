@@ -339,7 +339,7 @@ function startClocks() {
 // ---------- CATEGORY
 function pageShell(c, extra = "") {
   view.innerHTML = `<section class="page" style="--h:${c.hue}">
-    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat"><span id="cnt">Loading feeds…</span></div><p>${esc(c.blurb)}</p></div>
+    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat"><span id="cnt">Loading feeds…</span></div></div>
     ${extra}<div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
 }
 
@@ -391,8 +391,7 @@ function renderStocks() {
   view.innerHTML = `<section class="page herai">
     <div class="mkt"><a class="mk${us ? "" : " on"}" href="#/stocks">India</a><a class="mk${us ? " on" : ""}" href="#/stocks/usa">USA</a></div>
     <div class="crumb"><a href="#/home">Home</a> / News</div>
-    <h1>${name} Market News screener</h1>
-    <p class="hlead">Latest ${name} Stock Screener market, technology, and macro headlines aggregated from major publishers. Updated live in your browser.</p>
+    <h1>${name} Market News</h1>
     <div class="hcard"><div class="hpills" id="filters"></div>
       <div class="hstatus"><span id="cnt">Loading feeds…</span></div>
       <div id="list"></div></div></section>`;
@@ -551,7 +550,7 @@ function renderCompany() {
   route.days = 30;
   view.innerHTML = `<section class="page" style="--h:170">
     <div class="phead"><h1>${esc(c ? c.n : "Company")}</h1><div class="pstat"><span id="cnt"></span></div>
-    <p>${c ? `${esc(c.s)} · ${esc(c.r)}. Headlines from the past 30 days across global publishers.` : "Loading company…"}</p></div>
+    <p>${c ? `${esc(c.s)} · ${esc(c.r)}` : "Loading company…"}</p></div>
     <div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
   if (c) ensureShard(c.k);
   drawCompany();
