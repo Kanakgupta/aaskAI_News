@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -12,13 +12,12 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -37,3 +36,22 @@ jobs:
           path: public
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # GitHub's cron is throttled, so each run schedules the next one (workflow_dispatch via GITHUB_TOKEN is allowed to chain).
+  # The newest waiting job cancels older ones, so only one chain ever exists; the 15-minute cron restarts a broken chain.
+  next:
+    needs: deploy
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    concurrency:
+      group: refresh-chain
+      cancel-in-progress: true
+    steps:
+      - name: Wait, then start the next refresh
+        run: sleep 240
+      - run: gh workflow run refresh.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}

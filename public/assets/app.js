@@ -52,62 +52,21 @@ function trimmed(id, d) {
 const slot = () => Math.floor(Date.now() / 60000);
 const newer = (a, b) => !a || a.partial || new Date(b.generated) > new Date(a.generated);
 
-function loadCat(id, force = false) {
-  if (inflight[id] && !force) return inflight[id];
-  const before = new Set((store[id]?.items || []).map((n) => n.u));
-  const latest = store[id]?.items?.[0]?.d || "";
-  inflight[id] = fetch(`data/news-${id}.json?t=${force ? Date.now() : slot()}`, force ? { cache: "no-store" } : undefined)
+function loadCat(id) {
+  if (inflight[id]) return inflight[id];
+  inflight[id] = fetch(`data/news-${id}.json?t=${slot()}`)
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => {
       if (!Array.isArray(d.items)) throw new Error("bad payload");
       failed[id] = false;
-      if (!newer(store[id], d)) return { added: 0 };
-      const added = d.items.filter((n) => n.d > latest && !before.has(n.u)).length;
+      if (!newer(store[id], d)) return;
       store[id] = d;
       saveLocal(id, trimmed(id, d));
       onData(id);
-      return { added };
     })
-    .catch(() => { failed[id] = true; if (!store[id]) onData(id); return null; })
+    .catch(() => { failed[id] = true; if (!store[id]) onData(id); })
     .finally(() => { delete inflight[id]; updateStatus(); });
   return inflight[id];
-}
-
-let toastTimer;
-function toast(msg, ms = 4000) {
-  const t = $("#toast");
-  t.textContent = msg;
-  t.hidden = false;
-  clearTimeout(toastTimer);
-  if (ms) toastTimer = setTimeout(() => (t.hidden = true), ms);
-}
-
-let refreshing = false;
-async function refreshNow() {
-  if (refreshing) return;
-  refreshing = true;
-  const btn = $("#refreshAll");
-  btn.disabled = true;
-  toast("Refreshing…", 0);
-  const ids = route.name === "cat" ? [route.sid || route.cat] : [...CATS.map((c) => c.id), ...EXTRA];
-  if (route.name === "cat") route.drawn = false;
-  loadAux("markets");
-  loadAux("predictions");
-  const res = await Promise.all(ids.map((id) => loadCat(id, true)));
-  const ok = res.filter(Boolean);
-  const added = ok.reduce((a, r) => a + r.added, 0);
-  const times = ids.map((id) => store[id]?.generated).filter(Boolean).map((g) => new Date(g).getTime());
-  if (!ok.length) toast("Could not reach the news data. Check your connection and try again.");
-  else if (added) toast(`${added} new ${added === 1 ? "story" : "stories"} added at the top.`);
-  else {
-    const newest = Math.max(...times);
-    const staleMin = (Date.now() - newest) / 6e4;
-    toast(staleMin > 15
-      ? `No newer data yet. The server copy is ${ago(new Date(newest).toISOString()).replace(" ago", "")} old because the scheduled rebuild has not run since.`
-      : `You're up to date. Latest data was published ${ago(new Date(newest).toISOString())}.`, 7000);
-  }
-  btn.disabled = false;
-  refreshing = false;
 }
 
 function loadAux(name) {
@@ -378,9 +337,8 @@ function startClocks() {
 // ---------- CATEGORY
 function pageShell(c, extra = "") {
   view.innerHTML = `<section class="page" style="--h:${c.hue}">
-    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat"><span id="cnt">Loading feeds…</span><button class="btn" id="refresh" type="button">↻ Refresh</button></div><p>${esc(c.blurb)}</p></div>
+    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat"><span id="cnt">Loading feeds…</span></div><p>${esc(c.blurb)}</p></div>
     ${extra}<div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
-  $("#refresh").onclick = refreshNow;
 }
 
 function renderCat() {
@@ -429,9 +387,8 @@ function renderStocks() {
     <h1>${name} Market News screener</h1>
     <p class="hlead">Latest ${name} Stock Screener market, technology, and macro headlines aggregated from major publishers. Updated live in your browser.</p>
     <div class="hcard"><div class="hpills" id="filters"></div>
-      <div class="hstatus"><span id="cnt">Loading feeds…</span><button class="hbtn" id="refresh" type="button">↻ Refresh</button></div>
+      <div class="hstatus"><span id="cnt">Loading feeds…</span></div>
       <div id="list"></div></div></section>`;
-  $("#refresh").onclick = refreshNow;
   drawStocks();
 }
 
@@ -533,7 +490,6 @@ function drawTech(d) {
 // ---------- SEARCH
 function renderSearch() {
   pageShell({ id: "search", label: `Search: ${route.q}`, hue: 210, blurb: "Across every category loaded so far." });
-  $("#refresh").remove();
   drawSearch();
 }
 function drawSearch() {
@@ -572,7 +528,6 @@ function updateStatus() {
 document.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.remove(); }, true);
 $("#newPill").addEventListener("click", () => { route.drawn = false; drawCat(); window.scrollTo({ top: $(".catnav").offsetTop, behavior: "smooth" }); });
 window.addEventListener("hashchange", render);
-$("#refreshAll").addEventListener("click", refreshNow);
 
 // ---------- boot: paint cached data immediately, then fetch everything in parallel in the background
 buildNav();
@@ -582,8 +537,8 @@ route = parseRoute();
 render();
 updateStatus();
 loadAll();
-setInterval(() => [...CATS.map((c) => c.id), ...EXTRA].forEach(loadCat), 3 * 60 * 1000);
-setInterval(() => { loadAux("markets"); loadAux("predictions"); }, 3 * 60 * 1000);
+setInterval(() => [...CATS.map((c) => c.id), ...EXTRA].forEach(loadCat), 2 * 60 * 1000);
+setInterval(() => { loadAux("markets"); loadAux("predictions"); }, 2 * 60 * 1000);
 setInterval(updateStatus, 30000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { [...CATS.map((c) => c.id), ...EXTRA].forEach(loadCat); loadAux("markets"); } });
 })();
