@@ -43,7 +43,9 @@ const saveLocal = (k, d) => { try { localStorage.setItem(STORE_V + k, JSON.strin
 const readLocal = (k) => { try { return JSON.parse(localStorage.getItem(STORE_V + k) || "null"); } catch { return null; } };
 
 function trimmed(id, d) {
-  return { ...d, partial: true, items: d.items.slice(0, id === "tech" ? 250 : 120) };
+  const seen = {};
+  const items = d.tags?.length ? d.items.filter((n) => (seen[n.g] = (seen[n.g] || 0) + 1) <= 30) : d.items.slice(0, id === "tech" ? 250 : 120);
+  return { ...d, partial: true, items };
 }
 
 // ---------- data loading (static JSON refreshed by the scheduled workflow)
@@ -148,11 +150,11 @@ function techRow(n) {
   ].join("");
   const also = (n.al || []).map((a) => `<a href="${esc(safe(a.u))}" target="_blank" rel="noopener noreferrer">${esc(a.p)}</a>`).join("");
   const cov = n.cv > 1 && also ? `<button type="button" class="cov" data-cov aria-expanded="false">+${n.cv - 1} more outlet${n.cv > 2 ? "s" : ""} ▾</button>` : "";
-  return row(n, { desc: true, img: false, cov, extra: `<div class="chips">${chips}</div>${also ? `<div class="also" hidden>Also covered by: ${also}</div>` : ""}` });
+  return card(n, { cov, extra: `<div class="chips">${chips}</div>${also ? `<div class="also" hidden>Also covered by: ${also}</div>` : ""}` });
 }
 
 // ---------- infinite list: everything is already fetched, so rows stream in as you scroll
-function mountList(host, items, render, chunk = 30) {
+function mountList(host, items, render, chunk = 36) {
   host.innerHTML = "";
   const ul = document.createElement("ul");
   ul.className = "rows";
@@ -173,7 +175,9 @@ function mountList(host, items, render, chunk = 30) {
   disposers.push(() => io.disconnect());
 }
 
-const skeletons = (n) => Array.from({ length: n }, () => '<li class="row"><div class="rbody" style="width:100%"><i class="sk s"></i><i class="sk"></i><i class="sk" style="width:80%"></i></div></li>').join("");
+const skeletons = (n, cards = false) => Array.from({ length: n }, () => cards
+  ? '<li class="hitem"><div class="hbody"><i class="sk s"></i><i class="sk"></i><i class="sk" style="width:80%"></i></div></li>'
+  : '<li class="row"><div class="rbody" style="width:100%"><i class="sk s"></i><i class="sk"></i><i class="sk" style="width:80%"></i></div></li>').join("");
 
 // ---------- helpers
 const ageDays = (n) => (Date.now() - new Date(n.d).getTime()) / 864e5;
@@ -391,10 +395,12 @@ const hAgo = (iso) => {
   return `${Math.floor(h / 24)} days ago`;
 };
 
-function hrow(n) {
+function card(n, o = {}) {
   const img = n.i ? `<img class="hthumb" src="${esc(n.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : "";
-  return `<li class="hitem">${img}<div class="hbody"><div class="hmeta"><span class="htag">${esc(n.g)}</span><span class="hsrc">${esc(n.s)}</span><span class="htime">${hAgo(n.d)}</span></div>
-    <a class="htitle" href="${esc(safe(n.u))}" target="_blank" rel="noopener noreferrer">${esc(n.t)}</a>${n.x ? `<p class="hdesc">${esc(n.x)}</p>` : ""}</div></li>`;
+  const tag = o.tag ? `<span class="htag">${esc(o.tag)}</span>` : "";
+  const cat = o.catLabel ? `<span class="htag">${esc(o.catLabel)}</span>` : "";
+  return `<li class="hitem">${img}<div class="hbody"><div class="hmeta">${cat}${tag}<span class="hsrc">${esc(n.s)}</span><span class="htime">${hAgo(n.d)}</span>${n.w ? '<span class="badge">Press release</span>' : ""}${o.cov || ""}</div>
+    <a class="htitle" href="${esc(safe(n.u))}" target="_blank" rel="noopener noreferrer">${esc(n.t)}</a>${n.x ? `<p class="hdesc">${esc(n.x)}</p>` : ""}${o.extra || ""}</div></li>`;
 }
 
 // AI and Politics have their own sections, so the stock page leaves them out.
@@ -425,7 +431,7 @@ function drawStocks() {
   if (!list) return;
   if (!d) {
     $("#filters").innerHTML = "";
-    list.innerHTML = failed[id] ? '<div class="err">Could not load this feed right now. <button class="hbtn" id="retry" type="button">Retry</button></div>' : `<ul class="rows">${skeletons(6)}</ul>`;
+    list.innerHTML = failed[id] ? '<div class="err">Could not load this feed right now. <button class="hbtn" id="retry" type="button">Retry</button></div>' : `<ul class="rows">${skeletons(6, true)}</ul>`;
     const r = $("#retry"); if (r) r.onclick = () => { failed[id] = false; drawStocks(); loadCat(id); };
     return;
   }
@@ -436,13 +442,13 @@ function drawStocks() {
   f.onclick = (e) => { const b = e.target.closest("[data-f]"); if (b) { route.filter = b.dataset.f; drawStocks(); } };
   const items = d.items.filter((n) => !STOCK_HIDE.has(n.g) && (!route.filter || n.g === route.filter));
   $("#cnt").textContent = `${items.length} stories · updated ${hAgo(d.generated)}`;
-  mountList(list, items, hrow);
+  mountList(list, items, (n) => card(n, { tag: n.g }));
 }
 
 function covToggle(e) {
   const b = e.target.closest("[data-cov]");
   if (!b) return;
-  const box = b.closest(".rbody").querySelector(".also");
+  const box = b.closest(".hbody").querySelector(".also");
   box.hidden = !box.hidden;
   b.setAttribute("aria-expanded", String(!box.hidden));
 }
@@ -455,7 +461,7 @@ function drawCat() {
   if (!list) return;
   if (!d) {
     $("#filters").innerHTML = "";
-    list.innerHTML = failed[id] ? '<div class="err">Could not load this feed right now. <button class="btn" id="retry" type="button">Retry</button></div>' : `<ul class="rows">${skeletons(8)}</ul>`;
+    list.innerHTML = failed[id] ? '<div class="err">Could not load this feed right now. <button class="btn" id="retry" type="button">Retry</button></div>' : `<ul class="rows">${skeletons(9, true)}</ul>`;
     const r = $("#retry"); if (r) r.onclick = () => { failed[id] = false; drawCat(); loadCat(id); };
     return;
   }
@@ -475,7 +481,7 @@ function drawCat() {
   f.onclick = (e) => { const b = e.target.closest("[data-f]"); if (b) { route.filter = b.dataset.f; drawCat(); } };
   const items = d.items.filter((n) => !route.filter || (tags ? n.g === route.filter : n.s === route.filter));
   $("#cnt").textContent = `${items.length} stories · updated ${ago(d.generated)}`;
-  mountList(list, items, (n) => row(n, { desc: true, tag: tags ? (id === "stocks" ? n.g : tagLabel(id, n.g)) : "" }));
+  mountList(list, items, (n) => card(n, { tag: tags ? (id === "stocks" ? n.g : tagLabel(id, n.g)) : "" }));
 }
 
 // ---------- TECHNOLOGY (wireless newsroom)
@@ -531,7 +537,7 @@ function drawSearch() {
   const uniq = hits.filter((h) => !seen.has(h.n.u) && seen.add(h.n.u));
   const loading = CATS.filter((c) => !store[c.id]).length;
   $("#cnt").textContent = `${uniq.length} stories${loading ? ` · still loading ${loading} feeds` : ""}`;
-  mountList($("#list"), uniq, ({ n, c }) => row(n, { desc: true, catLabel: c.label }));
+  mountList($("#list"), uniq, ({ n, c }) => card(n, { catLabel: c.label }));
 }
 
 // ---------- chrome: nav, status, search box

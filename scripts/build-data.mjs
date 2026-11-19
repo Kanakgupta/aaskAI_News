@@ -15,7 +15,12 @@ async function buildCategory(id) {
   let items = (await Promise.all(cat.feeds.map(fetchFeed))).flat();
   if (cat.retag) items = items.map(cat.retag);
   items.sort((a, b) => b.d.localeCompare(a.d));
-  items = dedupe(items).slice(0, 400).map(({ su, ed, ...rest }) => rest);
+  items = dedupe(items).map(({ su, ed, ...rest }) => rest);
+  // Per-tag quota keeps quieter sections (e.g. Macro) from being pushed out by busy ones.
+  if (cat.tags) {
+    const seen = {};
+    items = items.filter((n) => (seen[n.g] = (seen[n.g] || 0) + 1) <= 80);
+  } else items = items.slice(0, 400);
   return { items, tags: cat.tags ? cat.tags.map(([k, label]) => ({ id: k, label })) : [] };
 }
 
