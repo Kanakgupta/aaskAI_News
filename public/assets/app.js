@@ -43,12 +43,12 @@ const saveLocal = (k, d) => { try { localStorage.setItem(STORE_V + k, JSON.strin
 const readLocal = (k) => { try { return JSON.parse(localStorage.getItem(STORE_V + k) || "null"); } catch { return null; } };
 
 function trimmed(id, d) {
-  return { ...d, items: d.items.slice(0, id === "tech" ? 250 : 80) };
+  return { ...d, partial: true, items: d.items.slice(0, id === "tech" ? 250 : 120) };
 }
 
 // ---------- data loading (static JSON refreshed by the scheduled workflow)
 const slot = () => Math.floor(Date.now() / 60000);
-const newer = (a, b) => !a || new Date(b.generated) > new Date(a.generated);
+const newer = (a, b) => !a || a.partial || new Date(b.generated) > new Date(a.generated);
 
 function loadCat(id, force = false) {
   if (inflight[id] && !force) return inflight[id];
@@ -393,9 +393,12 @@ const hAgo = (iso) => {
 
 function hrow(n) {
   const img = n.i ? `<img class="hthumb" src="${esc(n.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : "";
-  return `<li class="hitem"><div class="hbody"><div class="hmeta"><span class="htag">${esc(n.g)}</span><span class="hsrc">${esc(n.s)}</span><span class="htime">${hAgo(n.d)}</span></div>
-    <a class="htitle" href="${esc(safe(n.u))}" target="_blank" rel="noopener noreferrer">${esc(n.t)}</a>${n.x ? `<p class="hdesc">${esc(n.x)}</p>` : ""}</div>${img}</li>`;
+  return `<li class="hitem">${img}<div class="hbody"><div class="hmeta"><span class="htag">${esc(n.g)}</span><span class="hsrc">${esc(n.s)}</span><span class="htime">${hAgo(n.d)}</span></div>
+    <a class="htitle" href="${esc(safe(n.u))}" target="_blank" rel="noopener noreferrer">${esc(n.t)}</a>${n.x ? `<p class="hdesc">${esc(n.x)}</p>` : ""}</div></li>`;
 }
+
+// AI and Politics have their own sections, so the stock page leaves them out.
+const STOCK_HIDE = new Set(["AI", "POLITICAL"]);
 
 function renderStocks() {
   const us = route.market === "usa";
@@ -429,9 +432,9 @@ function drawStocks() {
   route.drawn = true;
   $("#newPill").hidden = true;
   const f = $("#filters");
-  f.innerHTML = [{ id: "", label: "All" }, ...(d.tags || [])].map((c) => `<button class="hpill${route.filter === c.id ? " on" : ""}" data-f="${esc(c.id)}" type="button">${esc(c.label)}</button>`).join("");
+  f.innerHTML = [{ id: "", label: "All" }, ...(d.tags || []).filter((c) => !STOCK_HIDE.has(c.id))].map((c) => `<button class="hpill${route.filter === c.id ? " on" : ""}" data-f="${esc(c.id)}" type="button">${esc(c.label)}</button>`).join("");
   f.onclick = (e) => { const b = e.target.closest("[data-f]"); if (b) { route.filter = b.dataset.f; drawStocks(); } };
-  const items = d.items.filter((n) => !route.filter || n.g === route.filter);
+  const items = d.items.filter((n) => !STOCK_HIDE.has(n.g) && (!route.filter || n.g === route.filter));
   $("#cnt").textContent = `${items.length} stories · updated ${hAgo(d.generated)}`;
   mountList(list, items, hrow);
 }
