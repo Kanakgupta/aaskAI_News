@@ -50,21 +50,56 @@ function trimmed(id, d) {
 const slot = () => Math.floor(Date.now() / 60000);
 const newer = (a, b) => !a || new Date(b.generated) > new Date(a.generated);
 
-function loadCat(id) {
-  if (inflight[id]) return inflight[id];
-  inflight[id] = fetch(`data/news-${id}.json?t=${slot()}`)
+function loadCat(id, force = false) {
+  if (inflight[id] && !force) return inflight[id];
+  const before = new Set((store[id]?.items || []).map((n) => n.u));
+  const latest = store[id]?.items?.[0]?.d || "";
+  inflight[id] = fetch(`data/news-${id}.json?t=${force ? Date.now() : slot()}`, force ? { cache: "no-store" } : undefined)
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => {
       if (!Array.isArray(d.items)) throw new Error("bad payload");
       failed[id] = false;
-      if (!newer(store[id], d)) return;
+      if (!newer(store[id], d)) return { added: 0 };
+      const added = d.items.filter((n) => n.d > latest && !before.has(n.u)).length;
       store[id] = d;
       saveLocal(id, trimmed(id, d));
       onData(id);
+      return { added };
     })
-    .catch(() => { failed[id] = true; if (!store[id]) onData(id); })
+    .catch(() => { failed[id] = true; if (!store[id]) onData(id); return null; })
     .finally(() => { delete inflight[id]; updateStatus(); });
   return inflight[id];
+}
+
+let toastTimer;
+function toast(msg, ms = 4000) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  if (ms) toastTimer = setTimeout(() => (t.hidden = true), ms);
+}
+
+let refreshing = false;
+async function refreshNow() {
+  if (refreshing) return;
+  refreshing = true;
+  const btn = $("#refreshAll");
+  btn.disabled = true;
+  toast("Refreshing…", 0);
+  const ids = route.name === "cat" ? [route.sid || route.cat] : [...CATS.map((c) => c.id), ...EXTRA];
+  if (route.name === "cat") route.drawn = false;
+  loadAux("markets");
+  loadAux("predictions");
+  const res = await Promise.all(ids.map((id) => loadCat(id, true)));
+  const ok = res.filter(Boolean);
+  const added = ok.reduce((a, r) => a + r.added, 0);
+  const times = ids.map((id) => store[id]?.generated).filter(Boolean).map((g) => new Date(g).getTime());
+  if (!ok.length) toast("Could not reach the news data. Check your connection and try again.");
+  else if (added) toast(`${added} new ${added === 1 ? "story" : "stories"} added at the top.`);
+  else toast(`You're up to date. Latest data was published ${ago(new Date(Math.max(...times)).toISOString())}; the site rebuilds every 5 minutes.`, 6000);
+  btn.disabled = false;
+  refreshing = false;
 }
 
 function loadAux(name) {
@@ -330,7 +365,7 @@ function pageShell(c, extra = "") {
   view.innerHTML = `<section class="page" style="--h:${c.hue}">
     <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat"><span id="cnt">Loading feeds…</span><button class="btn" id="refresh" type="button">↻ Refresh</button></div><p>${esc(c.blurb)}</p></div>
     ${extra}<div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
-  $("#refresh").onclick = () => { $("#cnt").textContent = "Refreshing…"; route.drawn = false; loadCat(c.id); };
+  $("#refresh").onclick = refreshNow;
 }
 
 function renderCat() {
@@ -376,7 +411,7 @@ function renderStocks() {
     <div class="hcard"><div class="hpills" id="filters"></div>
       <div class="hstatus"><span id="cnt">Loading feeds…</span><button class="hbtn" id="refresh" type="button">↻ Refresh</button></div>
       <div id="list"></div></div></section>`;
-  $("#refresh").onclick = () => { $("#cnt").textContent = "Refreshing…"; route.drawn = false; loadCat(route.sid); };
+  $("#refresh").onclick = refreshNow;
   drawStocks();
 }
 
@@ -517,6 +552,7 @@ function updateStatus() {
 document.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.remove(); }, true);
 $("#newPill").addEventListener("click", () => { route.drawn = false; drawCat(); window.scrollTo({ top: $(".catnav").offsetTop, behavior: "smooth" }); });
 window.addEventListener("hashchange", render);
+$("#refreshAll").addEventListener("click", refreshNow);
 
 // ---------- boot: paint cached data immediately, then fetch everything in parallel in the background
 buildNav();
