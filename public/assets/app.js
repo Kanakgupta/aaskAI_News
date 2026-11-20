@@ -37,6 +37,7 @@ const ago = (iso) => {
   return Math.round(h / 24) + "d ago";
 };
 const view = $("#view");
+const BACK = '<a class="back" href="#/home" aria-label="Back to home" title="Back to home"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></a>';
 
 // ---------- persistence (instant paint for repeat visitors)
 const saveLocal = (k, d) => { try { localStorage.setItem(STORE_V + k, JSON.stringify(d)); } catch { /* quota */ } };
@@ -339,6 +340,7 @@ function startClocks() {
 // ---------- CATEGORY
 function pageShell(c, extra = "") {
   view.innerHTML = `<section class="page" style="--h:${c.hue}">
+    ${BACK}
     <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat"><span id="cnt">Loading feeds…</span></div></div>
     ${extra}<div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
 }
@@ -390,7 +392,7 @@ function renderStocks() {
   route.drawn = false;
   view.innerHTML = `<section class="page herai">
     <div class="mkt"><a class="mk${us ? "" : " on"}" href="#/stocks">India</a><a class="mk${us ? " on" : ""}" href="#/stocks/usa">USA</a></div>
-    <a class="back" href="#/home" aria-label="Back to home" title="Back to home"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></a>
+    ${BACK}
     <h1>${name} Market News</h1>
     <div class="hcard"><div class="hpills" id="filters"></div>
       <div class="hstatus"><span id="cnt">Loading feeds…</span></div>
@@ -549,6 +551,7 @@ function renderCompany() {
   const c = coIdx.byId[route.id];
   route.days = 30;
   view.innerHTML = `<section class="page" style="--h:170">
+    ${BACK}
     <div class="phead"><h1>${esc(c ? c.n : "Company")}</h1><div class="pstat"><span id="cnt"></span></div>
     <p>${c ? `${esc(c.s)} · ${esc(c.r)}` : "Loading company…"}</p></div>
     <div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
@@ -575,6 +578,7 @@ function drawCompany() {
 function renderSearch() {
   route.days = 30;
   view.innerHTML = `<section class="page" style="--h:210">
+    ${BACK}
     <div class="phead"><h1>Search: ${esc(route.q)}</h1><div class="pstat"><span id="cnt"></span></div><div class="cochips" id="coChips"></div></div>
     <div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
   drawSearch();
