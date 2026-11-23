@@ -338,19 +338,21 @@ function startClocks() {
 }
 
 // ---------- CATEGORY
-function pageShell(c, extra = "") {
+function pageShell(c, extra = "", status = '<span id="cnt">Loading feeds…</span>') {
   view.innerHTML = `<section class="page" style="--h:${c.hue}">
     ${BACK}
-    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat"><span id="cnt">Loading feeds…</span></div></div>
+    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat${c.id === "tech" ? " tech-company-stat" : ""}">${status}</div></div>
     ${extra}<div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
 }
 
 function renderCat() {
   if (route.cat === "stocks") return renderStocks();
   const c = CAT[route.cat];
-  pageShell(c, c.id === "prediction" ? '<div class="odds-grid" id="oddsGrid"></div>' : "");
+  if (c.id === "tech") pageShell(c, TECH_COMPANY_PANEL, TECH_COMPANY_PICKER);
+  else pageShell(c, c.id === "prediction" ? '<div class="odds-grid" id="oddsGrid"></div>' : "");
   route.filter = "";
   route.t = { tech: "", reg: "", days: 30, theme: "", topic: "", sort: "date", wire: false, q: "" };
+  if (c.id === "tech") bindTechCompanyPicker();
   if (c.id === "prediction") fillOdds();
   route.drawn = false;
   drawCat();
@@ -491,39 +493,128 @@ function drawTech(d) {
     && (!s.theme || n.th.includes(s.theme)) && (!s.wire || n.w) && (!s.topic || (n.tp || []).includes(s.topic))
     && (!q || (n.t + " " + n.s + " " + (n.c || []).join(" ")).toLowerCase().includes(q)));
   rows.sort((a, b) => (s.sort === "date" ? b.d.localeCompare(a.d) : s.sort === "cv" ? b.cv - a.cv || b.sc - a.sc : b.sc - a.sc));
-  $("#cnt").textContent = `${rows.length} stories · updated ${ago(d.generated)}`;
   mountList($("#list"), rows, techRow);
+}
+
+const TECH_COMPANY_PICKER = `<details class="company-picker" id="techCompanyPicker">
+  <summary>Choose a tech company</summary>
+  <form class="company-menu" id="techCompanyMenu" autocomplete="off">
+    <input id="techCompanyQuery" type="search" placeholder="Search companies" aria-label="Search tech companies">
+    <div class="company-options" id="techCompanyOptions"></div>
+  </form>
+</details>`;
+const TECH_COMPANY_PANEL = `<section class="tech-company-panel" id="techCompanyPanel" aria-labelledby="techCompanyTitle" hidden>
+  <div class="tech-company-head">
+    <h2 id="techCompanyTitle"></h2><button class="btn" id="techCompanyClear" type="button">Clear company</button>
+    <div class="pstat" id="techCompanyCount" aria-live="polite"></div>
+  </div>
+  <div class="filters" id="techCompanyFilters"></div><div class="listbox" id="techCompanyList"></div>
+</section>`;
+
+function drawTechCompanyOptions() {
+  const q = $("#techCompanyQuery").value.trim().toLowerCase();
+  const companies = coIdx.list.filter((c) => !q || [c.n, ...c.t].some((name) => name.toLowerCase().startsWith(q)));
+  $("#techCompanyOptions").innerHTML = companies.map((c) =>
+    `<button type="button" data-company="${esc(c.id)}" aria-pressed="${c.id === route.t.company}">${esc(c.n)}</button>`).join("")
+    || `<p>${coIndexFailed ? "Could not load companies." : coIdx.list.length ? "No companies match." : "Loading companies..."}</p>`;
+}
+
+function bindTechCompanyPicker() {
+  const picker = $("#techCompanyPicker");
+  const summary = picker.querySelector("summary");
+  const query = $("#techCompanyQuery");
+  const options = $("#techCompanyOptions");
+  const select = (id) => {
+    const c = coIdx.byId[id];
+    route.t.company = id;
+    route.t.companyDays = 30;
+    picker.open = false;
+    summary.textContent = c ? c.n : "Choose a tech company";
+    summary.focus();
+    if (c) {
+      $("#techCompanyTitle").textContent = `${c.n} news`;
+      ensureShard(c.k);
+    }
+    $("#techCompanyPanel").hidden = !c;
+    if (c) drawTechCompany();
+  };
+  picker.ontoggle = () => {
+    if (!picker.open) return;
+    query.value = "";
+    drawTechCompanyOptions();
+    query.focus();
+    if (coIndexFailed) loadIndex();
+  };
+  query.oninput = () => { drawTechCompanyOptions(); options.scrollTop = 0; };
+  options.onclick = (e) => {
+    const option = e.target.closest("[data-company]");
+    if (option) select(option.dataset.company);
+  };
+  $("#techCompanyMenu").onsubmit = (e) => {
+    e.preventDefault();
+    const first = options.querySelector("[data-company]");
+    if (first) select(first.dataset.company);
+  };
+  picker.onkeydown = (e) => {
+    if (e.key === "Escape" && picker.open) { picker.open = false; summary.focus(); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      const next = e.target === query ? (e.key === "ArrowDown" ? options.firstElementChild : null)
+        : e.key === "ArrowDown" ? e.target.nextElementSibling : e.target.previousElementSibling || query;
+      if (next?.matches("button, input")) { e.preventDefault(); next.focus(); }
+    }
+  };
+  picker.onfocusout = (e) => { if (e.relatedTarget && !picker.contains(e.relatedTarget)) picker.open = false; };
+  const close = (e) => { if (!picker.contains(e.target)) picker.open = false; };
+  document.addEventListener("click", close);
+  disposers.push(() => document.removeEventListener("click", close));
+  $("#techCompanyClear").onclick = () => select("");
+}
+
+function drawTechCompany() {
+  const c = coIdx.byId[route.t.company];
+  if (!c) return;
+  drawCompanyNews(c, route.t.companyDays, {
+    list: $("#techCompanyList"), filters: $("#techCompanyFilters"), count: $("#techCompanyCount"),
+    setDays: (days) => { route.t.companyDays = days; drawTechCompany(); },
+  });
 }
 
 // ---------- COMPANIES: global tech-company news (pre-fetched into rotating shards by the build)
 const coIdx = { list: [], byId: {} };
 const coShard = {}, coFailed = {}, coInflight = {};
+let coIndexFailed = false;
 const googleLink = (q) => `https://news.google.com/search?q=${encodeURIComponent(q + " when:30d")}`;
 
 function setIndex(d) {
-  coIdx.list = d.companies || [];
+  coIdx.list = [...(d.companies || [])].sort((a, b) => a.n.localeCompare(b.n, "en"));
   coIdx.byId = Object.fromEntries(coIdx.list.map((c) => [c.id, c]));
 }
 function loadIndex() {
   const had = coIdx.list.length > 0;
   return fetch(`data/companies-index.json?t=${slot()}`).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
+    coIndexFailed = false;
     setIndex(d); saveLocal("coidx", d);
     if (!had && rendered && (route.name === "company" || route.name === "search")) render();
-  }).catch(() => {});
+    if ($("#techCompanyPicker")?.open) drawTechCompanyOptions();
+  }).catch(() => {
+    coIndexFailed = !coIdx.list.length;
+    if ($("#techCompanyPicker")?.open) drawTechCompanyOptions();
+  });
 }
 function loadShard(k) {
   if (coInflight[k]) return coInflight[k];
   coInflight[k] = fetch(`data/co-${k}.json?t=${slot()}`).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
     coFailed[k] = false;
-    if (!coShard[k] || new Date(d.generated) > new Date(coShard[k].generated)) { coShard[k] = d; onCompanyData(); }
-  }).catch(() => { coFailed[k] = true; onCompanyData(); }).finally(() => { delete coInflight[k]; });
+    if (!coShard[k] || new Date(d.generated) > new Date(coShard[k].generated)) { coShard[k] = d; onCompanyData(k); }
+  }).catch(() => { coFailed[k] = true; onCompanyData(k); }).finally(() => { delete coInflight[k]; });
   return coInflight[k];
 }
 const ensureShard = (k) => { if (!coShard[k] && !coInflight[k] && !coFailed[k]) loadShard(k); };
-function onCompanyData() {
+function onCompanyData(k) {
   if (!rendered) return;
   if (route.name === "company") drawCompany();
   else if (route.name === "search") drawSearch();
+  else if (route.cat === "tech" && coIdx.byId[route.t.company]?.k === k) drawTechCompany();
 }
 const companyItems = (c) => coShard[c.k]?.companies?.[c.id]?.items || [];
 
@@ -563,13 +654,24 @@ function drawCompany() {
   if (!list) return;
   const c = coIdx.byId[route.id];
   if (!c) { list.innerHTML = coIdx.list.length ? '<div class="err">Company not found. Use the search box above.</div>' : `<ul class="rows">${skeletons(6, true)}</ul>`; return; }
+  drawCompanyNews(c, route.days, {
+    list, filters: $("#filters"), count: $("#cnt"),
+    setDays: (days) => { route.days = days; drawCompany(); },
+  });
+}
+
+function drawCompanyNews(c, days, { list, filters, count, setDays }) {
   const sh = coShard[c.k];
-  if (!sh) { list.innerHTML = coFailed[c.k] ? '<div class="err">Could not load this company right now.</div>' : `<ul class="rows">${skeletons(9, true)}</ul>`; return; }
-  const f = $("#filters");
-  f.innerHTML = timeButtons(route.days);
-  f.onclick = (e) => { const b = e.target.closest("[data-days]"); if (b) { route.days = +b.dataset.days; drawCompany(); } };
-  const items = companyItems(c).filter((n) => inDays(n, route.days));
-  $("#cnt").textContent = `${items.length} stories · updated ${ago(sh.generated)}`;
+  if (!sh) {
+    count.textContent = coFailed[c.k] ? "" : "Loading company news...";
+    filters.innerHTML = "";
+    list.innerHTML = coFailed[c.k] ? '<div class="err">Could not load this company right now.</div>' : `<ul class="rows">${skeletons(9, true)}</ul>`;
+    return;
+  }
+  filters.innerHTML = timeButtons(days);
+  filters.onclick = (e) => { const b = e.target.closest("[data-days]"); if (b) setDays(+b.dataset.days); };
+  const items = companyItems(c).filter((n) => inDays(n, days));
+  count.textContent = `${items.length} stories · updated ${ago(sh.generated)}`;
   if (!items.length) { list.innerHTML = `<div class="err">No stories in this window. <a class="more" href="${esc(googleLink(c.n))}" target="_blank" rel="noopener noreferrer">Search Google News for ${esc(c.n)} ↗</a></div>`; return; }
   mountList(list, items, (n) => card(n, {}));
 }
