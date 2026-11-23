@@ -114,7 +114,7 @@ main{padding-block:22px 60px;min-height:70vh;outline:none}
 .phead h1,.herai h1{margin:0;font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;letter-spacing:-.02em;background:linear-gradient(100deg,#173c3a,#087f75 60%,#dc644e);-webkit-background-clip:text;background-clip:text;color:transparent}
 .phead p{margin:2px 0 0;color:var(--muted);flex-basis:100%}
 .pstat{display:flex;gap:12px;align-items:center;color:var(--muted);font-size:.85rem}
-.tech-company-stat{width:min(19rem,100%)}
+.company-stat{width:min(19rem,100%)}
 .company-picker{position:relative;width:100%;color:var(--text)}
 .company-picker summary,.company-menu input{padding:8px 12px;border:1px solid var(--line2);border-radius:8px;background:#fff;color:var(--text);font:inherit;overflow-wrap:anywhere}
 .company-picker summary{font-weight:600;cursor:pointer}
@@ -123,11 +123,12 @@ main{padding-block:22px 60px;min-height:70vh;outline:none}
 .company-options{max-height:min(16rem,40vh);overflow:auto;overscroll-behavior:contain}
 .company-options button{display:block;width:100%;padding:7px 10px;border:0;border-radius:4px;background:none;color:inherit;font:inherit;text-align:left;overflow-wrap:anywhere;cursor:pointer}
 .company-options button:hover,.company-options button:focus-visible,.company-options button[aria-pressed=true]{background:var(--panel2)}
+.company-options small{color:var(--muted)}
 .company-options p{padding:7px 10px}
-.tech-company-panel{margin-bottom:18px;padding:14px 0;border-block:1px solid var(--line2)}
-.tech-company-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin-bottom:12px}
-.tech-company-head h2{margin:0;font-size:1.3rem;overflow-wrap:anywhere}
-.tech-company-head .pstat{flex-basis:100%}
+.company-panel{margin-bottom:18px;padding:14px 0;border-block:1px solid var(--line2)}
+.company-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin-bottom:12px}
+.company-head h2{margin:0;font-size:1.3rem;overflow-wrap:anywhere}
+.company-head .pstat{flex-basis:100%}
 .btn,.hbtn{padding:7px 14px;border-radius:999px;border:1px solid var(--line2);background:#fff;color:var(--text);font-family:inherit;font-weight:600;font-size:.85rem;cursor:pointer}
 .btn:hover,.hbtn:hover{border-color:var(--a1);color:var(--a1)}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
@@ -180,6 +181,7 @@ main{padding-block:22px 60px;min-height:70vh;outline:none}
 .hlead{margin:0 0 20px;color:var(--muted);font-size:1.02rem;line-height:1.6;max-width:900px}
 .hcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:clamp(14px,2.4vw,22px);box-shadow:var(--sh)}
 .hpills{display:flex;flex-wrap:wrap;gap:8px}
+.market-list{margin-top:16px}
 .hpill{padding:8px 16px;font-size:.88rem}
 .hstatus{display:flex;align-items:center;gap:14px;margin:16px 0;color:var(--muted);font-size:.9rem;flex-wrap:wrap}
 .page .rows{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px}

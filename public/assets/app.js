@@ -341,18 +341,18 @@ function startClocks() {
 function pageShell(c, extra = "", status = '<span id="cnt">Loading feeds…</span>') {
   view.innerHTML = `<section class="page" style="--h:${c.hue}">
     ${BACK}
-    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat${c.id === "tech" ? " tech-company-stat" : ""}">${status}</div></div>
+    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat${c.id === "tech" ? " company-stat" : ""}">${status}</div></div>
     ${extra}<div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
 }
 
 function renderCat() {
   if (route.cat === "stocks") return renderStocks();
   const c = CAT[route.cat];
-  if (c.id === "tech") pageShell(c, TECH_COMPANY_PANEL, TECH_COMPANY_PICKER);
+  if (c.id === "tech") pageShell(c, COMPANY_PANEL, companyPicker("Choose a tech company", "tech companies"));
   else pageShell(c, c.id === "prediction" ? '<div class="odds-grid" id="oddsGrid"></div>' : "");
   route.filter = "";
   route.t = { tech: "", reg: "", days: 30, theme: "", topic: "", sort: "date", wire: false, q: "" };
-  if (c.id === "tech") bindTechCompanyPicker();
+  if (c.id === "tech") bindCompanyPicker(() => coIdx.list);
   if (c.id === "prediction") fillOdds();
   route.drawn = false;
   drawCat();
@@ -385,6 +385,53 @@ function card(n, o = {}) {
 
 // AI and Politics have their own sections, so the stock page leaves them out.
 const STOCK_HIDE = new Set(["AI", "POLITICAL"]);
+const STOCK_COMPANIES = {
+  stocks: [
+    ["Adani Enterprises", "ADANIENT"], ["Adani Ports", "ADANIPORTS"], ["Apollo Hospitals", "APOLLOHOSP"],
+    ["Asian Paints", "ASIANPAINT"], ["Axis Bank", "AXISBANK"], ["Bajaj Auto", "BAJAJ-AUTO"],
+    ["Bajaj Finance", "BAJFINANCE"], ["Bajaj Finserv", "BAJAJFINSV"], ["Bharat Electronics", "BEL"],
+    ["Bharti Airtel", "BHARTIARTL", "Airtel"], ["Coal India", "COALINDIA"], ["Cipla", "CIPLA"],
+    ["Dr. Reddy's Laboratories", "DRREDDY", "Dr Reddy's", "Dr. Reddy's"], ["Eicher Motors", "EICHERMOT"],
+    ["Eternal (Zomato)", "ETERNAL", "Zomato"], ["Grasim Industries", "GRASIM"], ["HCLTech", "HCLTECH", "HCL Technologies"],
+    ["HDFC Bank", "HDFCBANK"], ["HDFC Life", "HDFCLIFE"], ["Hero MotoCorp", "HEROMOTOCO"],
+    ["Hindalco Industries", "HINDALCO", "Hindalco"], ["Hindustan Unilever", "HINDUNILVR", "HUL"],
+    ["ICICI Bank", "ICICIBANK"], ["IndiGo (InterGlobe Aviation)", "INDIGO", "InterGlobe Aviation", "IndiGo"],
+    ["Infosys", "INFY"], ["ITC", "ITC"], ["Jio Financial Services", "JIOFIN", "Jio Financial"], ["JSW Steel", "JSWSTEEL"],
+    ["Kotak Mahindra Bank", "KOTAKBANK", "Kotak Bank"], ["Larsen & Toubro", "LT", "L&T"],
+    ["Mahindra & Mahindra", "M&M"], ["Maruti Suzuki", "MARUTI", "Maruti"], ["Nestlé India", "NESTLEIND", "Nestle India"],
+    ["NTPC", "NTPC"], ["Oil and Natural Gas Corporation", "ONGC"], ["Power Grid Corporation", "POWERGRID", "Power Grid Corp"],
+    ["Reliance Industries", "RELIANCE", "RIL"], ["SBI Life Insurance", "SBILIFE", "SBI Life"],
+    ["Shriram Finance", "SHRIRAMFIN"], ["State Bank of India", "SBIN", "SBI"], ["Sun Pharma", "SUNPHARMA"],
+    ["Tata Consultancy Services", "TCS"], ["Tata Consumer Products", "TATACONSUM"], ["Tata Motors", "TATAMOTORS"],
+    ["Tata Steel", "TATASTEEL"], ["Tech Mahindra", "TECHM"], ["Titan Company", "TITAN", "Titan Co"],
+    ["Trent", "TRENT"], ["UltraTech Cement", "ULTRACEMCO"], ["Wipro", "WIPRO"],
+  ],
+  stocksus: [
+    ["AbbVie", "ABBV"], ["Adobe", "ADBE"], ["Advanced Micro Devices", "AMD"], ["Alphabet (Google)", "GOOGL", "GOOG", "Alphabet", "Google"],
+    ["Amazon", "AMZN"], ["American Express", "AXP", "Amex"], ["Amgen", "AMGN"], ["Apple", "AAPL"], ["AT&T", "T"],
+    ["Bank of America", "BAC"], ["Berkshire Hathaway", "BRK.B", "BRK.A"], ["Boeing", "BA"], ["Broadcom", "AVGO"],
+    ["Caterpillar", "CAT"], ["Chevron", "CVX"], ["Cisco", "CSCO"], ["Coca-Cola", "KO", "Coca Cola"], ["Costco", "COST"],
+    ["Disney", "DIS", "Walt Disney"], ["Eli Lilly", "LLY"], ["ExxonMobil", "XOM", "Exxon Mobil", "Exxon"],
+    ["Goldman Sachs", "GS"], ["Home Depot", "HD"], ["Honeywell", "HON"], ["IBM", "IBM"], ["Intel", "INTC"],
+    ["Johnson & Johnson", "JNJ", "J&J"], ["JPMorgan Chase", "JPM", "JPMorgan", "JP Morgan"], ["Mastercard", "MA"],
+    ["McDonald's", "MCD"], ["Merck", "MRK"], ["Meta Platforms", "META", "Meta", "Facebook"], ["Microsoft", "MSFT"],
+    ["Morgan Stanley", "MS"], ["Netflix", "NFLX"], ["Nike", "NKE"], ["Nvidia", "NVDA"], ["Oracle", "ORCL"],
+    ["Palantir", "PLTR"], ["PepsiCo", "PEP"], ["Pfizer", "PFE"], ["Procter & Gamble", "PG", "P&G"],
+    ["Qualcomm", "QCOM"], ["Salesforce", "CRM"], ["Tesla", "TSLA"], ["UnitedHealth Group", "UNH", "UnitedHealth"],
+    ["Verizon", "VZ"], ["Visa", "V"], ["Walmart", "WMT"], ["Wells Fargo", "WFC"],
+  ],
+};
+
+const regexTerm = (term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function stockCompanies(id) {
+  return STOCK_COMPANIES[id].map(([n, ticker, ...aliases]) => {
+    const names = [n, ...aliases].map((term) => regexTerm(term).replace(/['\u2019]/g, "['\\u2019]"));
+    const nameMatch = new RegExp(`\\b(?:${names.join("|")})(?!\\w)`, "i");
+    const symbol = regexTerm(ticker);
+    const tickerMatch = new RegExp(`(?:\\$${symbol}|(?:NSE|BSE|NYSE|NASDAQ):\\s*${symbol}${ticker.length >= 3 ? `|\\b${symbol}` : ""})(?!\\w)`);
+    return { id: ticker, n, t: [ticker, ...aliases], ticker, matches: (text) => nameMatch.test(text) || tickerMatch.test(text) };
+  }).sort((a, b) => a.n.localeCompare(b.n, "en"));
+}
 
 function renderStocks() {
   const us = route.market === "usa";
@@ -392,13 +439,16 @@ function renderStocks() {
   route.sid = us ? "stocksus" : "stocks";
   route.filter = "";
   route.drawn = false;
+  const label = us ? "Choose a U.S. stock" : "Choose an Indian stock";
+  const companies = stockCompanies(route.sid);
   view.innerHTML = `<section class="page herai">
     <div class="mkt"><a class="mk${us ? "" : " on"}" href="#/stocks">India</a><a class="mk${us ? " on" : ""}" href="#/stocks/usa">USA</a></div>
     ${BACK}
-    <h1>${name} Market News</h1>
+    <div class="phead"><h1>${name} Market News</h1><div class="pstat company-stat">${companyPicker(label, `${name} stocks`, "Search name or ticker")}</div></div>
+    ${COMPANY_PANEL}
     <div class="hcard"><div class="hpills" id="filters"></div>
-      <div class="hstatus"><span id="cnt">Loading feeds…</span></div>
-      <div id="list"></div></div></section>`;
+      <div class="market-list" id="list"></div></div></section>`;
+  bindCompanyPicker(() => companies);
   drawStocks();
 }
 
@@ -407,6 +457,7 @@ function drawStocks() {
   const d = store[id];
   const list = $("#list");
   if (!list) return;
+  if (route.company) drawPickedCompany();
   if (!d) {
     $("#filters").innerHTML = "";
     list.innerHTML = failed[id] ? '<div class="err">Could not load this feed right now. <button class="hbtn" id="retry" type="button">Retry</button></div>' : `<ul class="rows">${skeletons(6, true)}</ul>`;
@@ -419,7 +470,6 @@ function drawStocks() {
   f.innerHTML = [{ id: "", label: "All" }, ...(d.tags || []).filter((c) => !STOCK_HIDE.has(c.id))].map((c) => `<button class="hpill${route.filter === c.id ? " on" : ""}" data-f="${esc(c.id)}" type="button">${esc(c.label)}</button>`).join("");
   f.onclick = (e) => { const b = e.target.closest("[data-f]"); if (b) { route.filter = b.dataset.f; drawStocks(); } };
   const items = d.items.filter((n) => !STOCK_HIDE.has(n.g) && (!route.filter || n.g === route.filter));
-  $("#cnt").textContent = `${items.length} stories · updated ${hAgo(d.generated)}`;
   mountList(list, items, (n) => card(n, { tag: n.g }));
 }
 
@@ -496,61 +546,61 @@ function drawTech(d) {
   mountList($("#list"), rows, techRow);
 }
 
-const TECH_COMPANY_PICKER = `<details class="company-picker" id="techCompanyPicker">
-  <summary>Choose a tech company</summary>
-  <form class="company-menu" id="techCompanyMenu" autocomplete="off">
-    <input id="techCompanyQuery" type="search" placeholder="Search companies" aria-label="Search tech companies">
-    <div class="company-options" id="techCompanyOptions"></div>
+const companyPicker = (label, search, placeholder = "Search companies") => `<details class="company-picker" id="companyPicker">
+  <summary>${esc(label)}</summary>
+  <form class="company-menu" autocomplete="off">
+    <input type="search" placeholder="${esc(placeholder)}" aria-label="Search ${esc(search)}">
+    <div class="company-options"></div>
   </form>
 </details>`;
-const TECH_COMPANY_PANEL = `<section class="tech-company-panel" id="techCompanyPanel" aria-labelledby="techCompanyTitle" hidden>
-  <div class="tech-company-head">
-    <h2 id="techCompanyTitle"></h2><button class="btn" id="techCompanyClear" type="button">Clear company</button>
-    <div class="pstat" id="techCompanyCount" aria-live="polite"></div>
+const COMPANY_PANEL = `<section class="company-panel" id="pickedCompanyPanel" aria-labelledby="pickedCompanyTitle" hidden>
+  <div class="company-head">
+    <h2 id="pickedCompanyTitle"></h2><button class="btn" id="pickedCompanyClear" type="button">Clear company</button>
+    <div class="pstat" id="pickedCompanyCount" aria-live="polite"></div>
   </div>
-  <div class="filters" id="techCompanyFilters"></div><div class="listbox" id="techCompanyList"></div>
+  <div class="filters" id="pickedCompanyFilters"></div><div class="listbox" id="pickedCompanyList"></div>
 </section>`;
 
-function drawTechCompanyOptions() {
-  const q = $("#techCompanyQuery").value.trim().toLowerCase();
-  const companies = coIdx.list.filter((c) => !q || [c.n, ...c.t].some((name) => name.toLowerCase().startsWith(q)));
-  $("#techCompanyOptions").innerHTML = companies.map((c) =>
-    `<button type="button" data-company="${esc(c.id)}" aria-pressed="${c.id === route.t.company}">${esc(c.n)}</button>`).join("")
-    || `<p>${coIndexFailed ? "Could not load companies." : coIdx.list.length ? "No companies match." : "Loading companies..."}</p>`;
-}
-
-function bindTechCompanyPicker() {
-  const picker = $("#techCompanyPicker");
+function bindCompanyPicker(getCompanies) {
+  const picker = $("#companyPicker");
   const summary = picker.querySelector("summary");
-  const query = $("#techCompanyQuery");
-  const options = $("#techCompanyOptions");
+  const initial = summary.textContent;
+  const query = picker.querySelector("input");
+  const options = picker.querySelector(".company-options");
+  const drawOptions = () => {
+    const q = query.value.trim().toLowerCase();
+    const companies = getCompanies();
+    const matches = companies.filter((c) => !q || [c.n, ...c.t].some((name) => name.toLowerCase().startsWith(q)));
+    options.innerHTML = matches.map((c) =>
+      `<button type="button" data-company="${esc(c.id)}" aria-pressed="${c.id === route.company?.id}">${esc(c.n)}${c.ticker ? ` <small>${esc(c.ticker)}</small>` : ""}</button>`).join("")
+      || `<p>${companies.length ? "No companies match." : coIndexFailed ? "Could not load companies." : "Loading companies..."}</p>`;
+  };
+  route.refreshCompanyOptions = () => { if (picker.open) drawOptions(); };
   const select = (id) => {
-    const c = coIdx.byId[id];
-    route.t.company = id;
-    route.t.companyDays = 30;
+    const c = getCompanies().find((company) => company.id === id);
+    route.company = c;
+    route.companyDays = 30;
     picker.open = false;
-    summary.textContent = c ? c.n : "Choose a tech company";
+    summary.textContent = c ? c.n : initial;
     summary.focus();
-    if (c) {
-      $("#techCompanyTitle").textContent = `${c.n} news`;
-      ensureShard(c.k);
-    }
-    $("#techCompanyPanel").hidden = !c;
-    if (c) drawTechCompany();
+    $("#pickedCompanyPanel").hidden = !c;
+    if (!c) return;
+    $("#pickedCompanyTitle").textContent = `${c.n} news`;
+    drawPickedCompany();
   };
   picker.ontoggle = () => {
     if (!picker.open) return;
     query.value = "";
-    drawTechCompanyOptions();
+    drawOptions();
     query.focus();
-    if (coIndexFailed) loadIndex();
+    if (!route.sid && coIndexFailed) loadIndex();
   };
-  query.oninput = () => { drawTechCompanyOptions(); options.scrollTop = 0; };
+  query.oninput = () => { drawOptions(); options.scrollTop = 0; };
   options.onclick = (e) => {
     const option = e.target.closest("[data-company]");
     if (option) select(option.dataset.company);
   };
-  $("#techCompanyMenu").onsubmit = (e) => {
+  picker.querySelector("form").onsubmit = (e) => {
     e.preventDefault();
     const first = options.querySelector("[data-company]");
     if (first) select(first.dataset.company);
@@ -567,16 +617,24 @@ function bindTechCompanyPicker() {
   const close = (e) => { if (!picker.contains(e.target)) picker.open = false; };
   document.addEventListener("click", close);
   disposers.push(() => document.removeEventListener("click", close));
-  $("#techCompanyClear").onclick = () => select("");
+  $("#pickedCompanyClear").onclick = () => select("");
 }
 
-function drawTechCompany() {
-  const c = coIdx.byId[route.t.company];
+function drawPickedCompany() {
+  const c = route.company;
   if (!c) return;
-  drawCompanyNews(c, route.t.companyDays, {
-    list: $("#techCompanyList"), filters: $("#techCompanyFilters"), count: $("#techCompanyCount"),
-    setDays: (days) => { route.t.companyDays = days; drawTechCompany(); },
-  });
+  const panel = {
+    list: $("#pickedCompanyList"), filters: $("#pickedCompanyFilters"), count: $("#pickedCompanyCount"),
+    setDays: (days) => { route.companyDays = days; drawPickedCompany(); },
+  };
+  if (!route.sid) {
+    ensureShard(c.k);
+    return drawCompanyNews(c, route.companyDays, panel);
+  }
+  const d = store[route.sid];
+  if (!d) return drawCompanyPending(panel, failed[route.sid]);
+  const items = d.items.filter((n) => !STOCK_HIDE.has(n.g) && c.matches(`${n.t} ${n.to || ""} ${n.x || ""}`));
+  drawCompanyStories(c, route.companyDays, panel, items, d.generated);
 }
 
 // ---------- COMPANIES: global tech-company news (pre-fetched into rotating shards by the build)
@@ -595,10 +653,10 @@ function loadIndex() {
     coIndexFailed = false;
     setIndex(d); saveLocal("coidx", d);
     if (!had && rendered && (route.name === "company" || route.name === "search")) render();
-    if ($("#techCompanyPicker")?.open) drawTechCompanyOptions();
+    if (route.cat === "tech") route.refreshCompanyOptions?.();
   }).catch(() => {
     coIndexFailed = !coIdx.list.length;
-    if ($("#techCompanyPicker")?.open) drawTechCompanyOptions();
+    if (route.cat === "tech") route.refreshCompanyOptions?.();
   });
 }
 function loadShard(k) {
@@ -614,7 +672,7 @@ function onCompanyData(k) {
   if (!rendered) return;
   if (route.name === "company") drawCompany();
   else if (route.name === "search") drawSearch();
-  else if (route.cat === "tech" && coIdx.byId[route.t.company]?.k === k) drawTechCompany();
+  else if (route.cat === "tech" && route.company?.k === k) drawPickedCompany();
 }
 const companyItems = (c) => coShard[c.k]?.companies?.[c.id]?.items || [];
 
@@ -660,18 +718,23 @@ function drawCompany() {
   });
 }
 
-function drawCompanyNews(c, days, { list, filters, count, setDays }) {
+function drawCompanyNews(c, days, panel) {
   const sh = coShard[c.k];
-  if (!sh) {
-    count.textContent = coFailed[c.k] ? "" : "Loading company news...";
-    filters.innerHTML = "";
-    list.innerHTML = coFailed[c.k] ? '<div class="err">Could not load this company right now.</div>' : `<ul class="rows">${skeletons(9, true)}</ul>`;
-    return;
-  }
+  if (!sh) return drawCompanyPending(panel, coFailed[c.k]);
+  drawCompanyStories(c, days, panel, companyItems(c), sh.generated);
+}
+
+function drawCompanyPending({ list, filters, count }, failed) {
+  count.textContent = failed ? "" : "Loading company news...";
+  filters.innerHTML = "";
+  list.innerHTML = failed ? '<div class="err">Could not load this company right now.</div>' : `<ul class="rows">${skeletons(9, true)}</ul>`;
+}
+
+function drawCompanyStories(c, days, { list, filters, count, setDays }, stories, generated) {
   filters.innerHTML = timeButtons(days);
   filters.onclick = (e) => { const b = e.target.closest("[data-days]"); if (b) setDays(+b.dataset.days); };
-  const items = companyItems(c).filter((n) => inDays(n, days));
-  count.textContent = `${items.length} stories · updated ${ago(sh.generated)}`;
+  const items = stories.filter((n) => inDays(n, days));
+  count.textContent = `${items.length} stories · updated ${ago(generated)}`;
   if (!items.length) { list.innerHTML = `<div class="err">No stories in this window. <a class="more" href="${esc(googleLink(c.n))}" target="_blank" rel="noopener noreferrer">Search Google News for ${esc(c.n)} ↗</a></div>`; return; }
   mountList(list, items, (n) => card(n, {}));
 }
