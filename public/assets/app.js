@@ -338,21 +338,28 @@ function startClocks() {
 }
 
 // ---------- CATEGORY
-function pageShell(c, extra = "", status = '<span id="cnt">Loading feeds…</span>') {
+function pageShell(c, extra = "", picker = "") {
   view.innerHTML = `<section class="page" style="--h:${c.hue}">
     ${BACK}
-    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat${c.id === "tech" ? " company-stat" : ""}">${status}</div></div>
+    <div class="phead"><h1>${esc(c.label)}</h1><div class="pstat${picker ? " company-stat" : ""}">${picker || '<span id="cnt">Loading feeds…</span>'}</div></div>
     ${extra}<div class="filters" id="filters"></div><div class="listbox" id="list"></div></section>`;
 }
+
+const AI_COMPANY_IDS = new Set([
+  "adobe", "alibaba", "alphabet-google", "amazon", "amd", "apple", "baidu", "bytedance-tiktok", "ibm",
+  "meta-platforms", "microsoft", "nvidia", "salesforce", "tencent",
+]);
 
 function renderCat() {
   if (route.cat === "stocks") return renderStocks();
   const c = CAT[route.cat];
-  if (c.id === "tech") pageShell(c, COMPANY_PANEL, companyPicker("Choose a tech company", "tech companies"));
+  const companyType = c.id === "ai" ? "AI" : c.id === "tech" ? "tech" : "";
+  if (companyType) pageShell(c, COMPANY_PANEL, companyPicker(`Choose ${c.id === "ai" ? "an" : "a"} ${companyType} company`, `${companyType} companies`));
   else pageShell(c, c.id === "prediction" ? '<div class="odds-grid" id="oddsGrid"></div>' : "");
   route.filter = "";
   route.t = { tech: "", reg: "", days: 30, theme: "", topic: "", sort: "date", wire: false, q: "" };
-  if (c.id === "tech") bindCompanyPicker(() => coIdx.list);
+  if (companyType) bindCompanyPicker(() => c.id === "ai"
+    ? coIdx.list.filter((company) => company.s === "AI" || AI_COMPANY_IDS.has(company.id)) : coIdx.list);
   if (c.id === "prediction") fillOdds();
   route.drawn = false;
   drawCat();
@@ -508,7 +515,8 @@ function drawCat() {
   f.innerHTML = `<div class="fgroup">${chips.map((c) => `<button class="tbtn${route.filter === c.id ? " on" : ""}" data-f="${esc(c.id)}" type="button">${esc(c.label)}</button>`).join("")}</div>`;
   f.onclick = (e) => { const b = e.target.closest("[data-f]"); if (b) { route.filter = b.dataset.f; drawCat(); } };
   const items = d.items.filter((n) => !route.filter || (tags ? n.g === route.filter : n.s === route.filter));
-  $("#cnt").textContent = `${items.length} stories · updated ${ago(d.generated)}`;
+  const count = $("#cnt");
+  if (count) count.textContent = `${items.length} stories · updated ${ago(d.generated)}`;
   mountList(list, items, (n) => card(n, { tag: tags ? (id === "stocks" ? n.g : tagLabel(id, n.g)) : "" }));
 }
 
@@ -575,7 +583,7 @@ function bindCompanyPicker(getCompanies) {
       `<button type="button" data-company="${esc(c.id)}" aria-pressed="${c.id === route.company?.id}">${esc(c.n)}${c.ticker ? ` <small>${esc(c.ticker)}</small>` : ""}</button>`).join("")
       || `<p>${companies.length ? "No companies match." : coIndexFailed ? "Could not load companies." : "Loading companies..."}</p>`;
   };
-  route.refreshCompanyOptions = () => { if (picker.open) drawOptions(); };
+  if (!route.sid) route.refreshCompanyOptions = () => { if (picker.open) drawOptions(); };
   const select = (id) => {
     const c = getCompanies().find((company) => company.id === id);
     route.company = c;
@@ -653,10 +661,10 @@ function loadIndex() {
     coIndexFailed = false;
     setIndex(d); saveLocal("coidx", d);
     if (!had && rendered && (route.name === "company" || route.name === "search")) render();
-    if (route.cat === "tech") route.refreshCompanyOptions?.();
+    route.refreshCompanyOptions?.();
   }).catch(() => {
     coIndexFailed = !coIdx.list.length;
-    if (route.cat === "tech") route.refreshCompanyOptions?.();
+    route.refreshCompanyOptions?.();
   });
 }
 function loadShard(k) {
@@ -672,7 +680,7 @@ function onCompanyData(k) {
   if (!rendered) return;
   if (route.name === "company") drawCompany();
   else if (route.name === "search") drawSearch();
-  else if (route.cat === "tech" && route.company?.k === k) drawPickedCompany();
+  else if (route.company?.k === k) drawPickedCompany();
 }
 const companyItems = (c) => coShard[c.k]?.companies?.[c.id]?.items || [];
 
